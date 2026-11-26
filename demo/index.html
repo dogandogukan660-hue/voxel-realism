@@ -3,44 +3,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Photorealistic Voxel Water & Coastal Simulation</title>
+    <title>Unity 6 / Tessendorf Ocean Water & Voxel Engine</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { overflow: hidden; background: #030710; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { overflow: hidden; background: #02050b; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
         #canvas-container { width: 100vw; height: 100vh; display: block; }
         #hud {
             position: absolute; top: 18px; left: 18px;
-            background: rgba(8, 14, 26, 0.88); backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px;
-            padding: 16px 22px; color: #f1f5f9; max-width: 390px; pointer-events: none;
-            box-shadow: 0 16px 40px rgba(0,0,0,0.7);
+            background: rgba(6, 11, 20, 0.88); backdrop-filter: blur(14px);
+            border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 12px;
+            padding: 16px 22px; color: #f1f5f9; max-width: 400px; pointer-events: none;
+            box-shadow: 0 16px 45px rgba(0,0,0,0.75);
         }
-        #hud h1 { font-size: 1.18rem; font-weight: 700; color: #38bdf8; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+        #hud h1 { font-size: 1.2rem; font-weight: 700; color: #38bdf8; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
         #hud p { font-size: 0.83rem; color: #94a3b8; line-height: 1.45; margin-bottom: 10px; }
         .tag-row { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; }
-        .badge { display: inline-block; padding: 3px 8px; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); border-radius: 5px; font-size: 0.72rem; color: #7dd3fc; }
+        .badge { display: inline-block; padding: 3px 8px; background: rgba(56, 189, 248, 0.16); border: 1px solid rgba(56, 189, 248, 0.45); border-radius: 5px; font-size: 0.72rem; color: #7dd3fc; }
         .controls-hint { font-size: 0.78rem; color: #cbd5e1; border-top: 1px solid rgba(255, 255, 255, 0.12); padding-top: 10px; }
         .controls-hint div { margin-bottom: 4px; }
         .controls-hint span { color: #f59e0b; font-weight: 600; min-width: 95px; display: inline-block; }
         #water-status {
             position: absolute; top: 18px; right: 18px;
-            background: rgba(8, 14, 26, 0.85); backdrop-filter: blur(10px);
-            border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 20px;
+            background: rgba(6, 11, 20, 0.88); backdrop-filter: blur(10px);
+            border: 1px solid rgba(56, 189, 248, 0.4); border-radius: 20px;
             padding: 8px 16px; color: #38bdf8; font-size: 0.82rem; font-weight: 600;
             display: flex; align-items: center; gap: 8px;
         }
-        #water-status .indicator { width: 8px; height: 8px; border-radius: 50%; background: #38bdf8; box-shadow: 0 0 10px #38bdf8; }
+        #water-status .indicator { width: 8px; height: 8px; border-radius: 50%; background: #38bdf8; box-shadow: 0 0 12px #38bdf8; }
         #underwater-overlay {
             position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
             pointer-events: none; opacity: 0; transition: opacity 0.3s ease;
-            background: radial-gradient(circle at center, rgba(3, 45, 68, 0.4) 0%, rgba(1, 20, 35, 0.85) 100%);
+            background: radial-gradient(circle at center, rgba(3, 40, 62, 0.45) 0%, rgba(1, 15, 28, 0.9) 100%);
             mix-blend-mode: multiply;
         }
         #toolbar {
             position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%);
-            display: flex; gap: 10px; background: rgba(15, 23, 42, 0.92);
-            padding: 8px 14px; border-radius: 30px; border: 1px solid rgba(255, 255, 255, 0.18);
-            backdrop-filter: blur(10px); box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+            display: flex; gap: 10px; background: rgba(10, 18, 32, 0.94);
+            padding: 8px 14px; border-radius: 30px; border: 1px solid rgba(56, 189, 248, 0.3);
+            backdrop-filter: blur(10px); box-shadow: 0 10px 30px rgba(0,0,0,0.7);
         }
         .tool-btn {
             background: #1e293b; border: 1px solid #334155; color: #e2e8f0;
@@ -67,14 +67,14 @@
 </head>
 <body>
     <div id="hud">
-        <h1><span>🌊</span> 5-Layer Photorealistic Water</h1>
-        <p>Implemented based on Screenshot_40: Base + Gerstner Displacement + Physical Transmission + Volumetric Absorption + Dynamic Caustics & Foam.</p>
+        <h1><span>🌊</span> Unity 6 Ocean Water System</h1>
+        <p>Photorealistic ocean based on Screenshot_41: 8-octave Gerstner waves with Jacobian wave-crest whitecaps, Subsurface Scattering (SSS), transmission, and dynamic foam.</p>
         <div class="tag-row">
-            <span class="badge">Transmission (Saydam)</span>
-            <span class="badge">Volume (Beer-Lambert)</span>
-            <span class="badge">Dynamic Caustics</span>
-            <span class="badge">Surface Foam Particles</span>
-            <span class="badge">Sualtı Modu & Bulanıklık</span>
+            <span class="badge">Jacobian Whitecaps</span>
+            <span class="badge">Subsurface Scattering</span>
+            <span class="badge">Sun Glitter Anisotropy</span>
+            <span class="badge">Beer-Lambert Volume</span>
+            <span class="badge">Sualtı Modu & Sis</span>
         </div>
         <div class="controls-hint">
             <div><span>Sağ Tık + Döndür:</span> Kamerayı suyun altına sokabilirsin!</div>
@@ -85,7 +85,7 @@
 
     <div id="water-status">
         <span class="indicator"></span>
-        <span id="status-text">Su Üstü (Surface)</span>
+        <span id="status-text">Okyanus Yüzeyi (Surface)</span>
     </div>
 
     <div id="underwater-overlay"></div>
@@ -122,31 +122,29 @@
         const container = document.getElementById('canvas-container');
         const scene = new THREE.Scene();
 
-        // Atmospheric Fog (will dynamically change when underwater)
-        const surfaceFogColor = new THREE.Color(0x0e1b2e);
-        const underwaterFogColor = new THREE.Color(0x042436);
+        const surfaceFogColor = new THREE.Color(0x0a1626);
+        const underwaterFogColor = new THREE.Color(0x022033);
         scene.fog = new THREE.FogExp2(surfaceFogColor, 0.012);
 
         const camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(2, 6.5, 22);
+        camera.position.set(0.5, 7.5, 23.0);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        renderer.toneMappingExposure = 1.05;
+        renderer.toneMappingExposure = 1.08;
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         container.appendChild(renderer.domElement);
 
-        // OrbitControls: Allows camera to freely dive UNDER the water surface!
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
         controls.dampingFactor = 0.05;
-        controls.maxPolarAngle = Math.PI * 0.95; // Unlocked for underwater navigation!
+        controls.maxPolarAngle = Math.PI * 0.95; // Full underwater navigation
         controls.minDistance = 2;
-        controls.maxDistance = 85;
-        controls.target.set(0, 2, 0);
+        controls.maxDistance = 90;
+        controls.target.set(0, 2.2, 0);
 
         // 3. Sun & Atmospheric Sky
         const sky = new Sky();
@@ -155,19 +153,19 @@
 
         const skyUniforms = sky.material.uniforms;
         skyUniforms['turbidity'].value = 4.0;
-        skyUniforms['rayleigh'].value = 1.6;
+        skyUniforms['rayleigh'].value = 1.8;
         skyUniforms['mieCoefficient'].value = 0.005;
         skyUniforms['mieDirectionalG'].value = 0.8;
 
         const sun = new THREE.Vector3();
-        const elevation = 22.0;
-        const azimuth = 145.0;
+        const elevation = 24.0;
+        const azimuth = 155.0;
         const phi = THREE.MathUtils.degToRad(90 - elevation);
         const theta = THREE.MathUtils.degToRad(azimuth);
         sun.setFromSphericalCoords(1, phi, theta);
         skyUniforms['sunPosition'].value.copy(sun);
 
-        const sunLight = new THREE.DirectionalLight(0xfff3e3, 3.2);
+        const sunLight = new THREE.DirectionalLight(0xfff5e6, 3.4);
         sunLight.position.copy(sun).multiplyScalar(80);
         sunLight.castShadow = true;
         sunLight.shadow.mapSize.width = 2048;
@@ -182,18 +180,18 @@
         sunLight.shadow.bias = -0.0004;
         scene.add(sunLight);
 
-        const hemiLight = new THREE.HemisphereLight(0x769ecb, 0x243b4d, 1.2);
+        const hemiLight = new THREE.HemisphereLight(0x78a5d1, 0x1f3445, 1.3);
         scene.add(hemiLight);
 
-        // Warm Pier Lamp
+        // Pier Lamp
         const lampLight = new THREE.PointLight(0xffb84d, 4.0, 16, 1.6);
         lampLight.position.set(-6.5, 4.8, 6.0);
         lampLight.castShadow = true;
         scene.add(lampLight);
 
-        // 4. Procedural Caustics Canvas Texture
-        function createCausticsCanvas() {
-            const size = 256;
+        // 4. Procedural Wind Ripples & Foam Texture Generator
+        function createOceanFoamCanvas() {
+            const size = 512;
             const canvas = document.createElement('canvas');
             canvas.width = size;
             canvas.height = size;
@@ -202,15 +200,17 @@
             for (let y = 0; y < size; y++) {
                 for (let x = 0; x < size; x++) {
                     const idx = (y * size + x) * 4;
-                    const u = (x / size) * Math.PI * 6;
-                    const v = (y / size) * Math.PI * 6;
-                    // Dual Voronoi wave interference caustics
-                    const c1 = Math.sin(u + Math.sin(v * 1.5)) * 0.5 + 0.5;
-                    const c2 = Math.cos(v + Math.cos(u * 1.8)) * 0.5 + 0.5;
-                    const caustic = Math.pow(c1 * c2, 2.5) * 255;
-                    imgData.data[idx + 0] = caustic * 0.7;
-                    imgData.data[idx + 1] = caustic * 0.95;
-                    imgData.data[idx + 2] = caustic;
+                    const u = (x / size) * Math.PI * 16;
+                    const v = (y / size) * Math.PI * 16;
+                    // Fractal cellular foam pattern
+                    const n1 = Math.sin(u + Math.sin(v * 2.0)) * 0.5 + 0.5;
+                    const n2 = Math.cos(v + Math.cos(u * 2.5)) * 0.5 + 0.5;
+                    const n3 = Math.sin(u * 3.2 - v * 2.8) * 0.5 + 0.5;
+                    const foam = Math.pow(n1 * n2 * n3, 1.8) * 255;
+
+                    imgData.data[idx + 0] = foam;
+                    imgData.data[idx + 1] = foam * 0.98;
+                    imgData.data[idx + 2] = foam * 0.95;
                     imgData.data[idx + 3] = 255;
                 }
             }
@@ -218,20 +218,14 @@
             return canvas;
         }
 
-        const causticsTexture = new THREE.CanvasTexture(createCausticsCanvas());
-        causticsTexture.wrapS = causticsTexture.wrapT = THREE.RepeatWrapping;
-        causticsTexture.repeat.set(8, 8);
+        const foamTexture = new THREE.CanvasTexture(createOceanFoamCanvas());
+        foamTexture.wrapS = foamTexture.wrapT = THREE.RepeatWrapping;
+        foamTexture.repeat.set(16, 16);
 
-        // 5. Micro-Voxel World Construction (Seabed, Submerged Hull, Pier, House)
+        // 5. Micro-Voxel World Construction (0.28m voxels)
         const VOXEL_SIZE = 0.28;
         const voxelGeo = new THREE.BoxGeometry(VOXEL_SIZE, VOXEL_SIZE, VOXEL_SIZE);
-
-        // Custom Shader Material for Voxels with Animated Caustics on Submerged Surfaces
-        const voxelMaterial = new THREE.MeshStandardMaterial({
-            roughness: 0.8,
-            metalness: 0.1,
-            flatShading: true
-        });
+        const voxelMaterial = new THREE.MeshStandardMaterial({ roughness: 0.8, metalness: 0.1, flatShading: true });
 
         const MAX_VOXELS = 26000;
         const instancedVoxels = new THREE.InstancedMesh(voxelGeo, voxelMaterial, MAX_VOXELS);
@@ -259,38 +253,32 @@
             voxelCount++;
         }
 
-        // --- Build Scene ---
-        // A) Submerged Seabed (Visible through the transparent water!)
+        // Seabed (visible underwater)
         for (let x = -35; x <= 35; x += 2) {
             for (let z = -25; z <= 40; z += 2) {
                 const depth = -8 - Math.floor(Math.sin(x * 0.1) * Math.cos(z * 0.1) * 3);
                 for (let y = depth; y <= depth + 1; y++) {
                     const isSand = (x > -15 && x < 25 && z > 5);
-                    addVoxel(x, y, z, isSand ? 0xd6c29b : 0x4a545a); // Seabed sand and gravel
+                    addVoxel(x, y, z, isSand ? 0xd6c29b : 0x4a545a);
                 }
             }
         }
 
-        // B) Wooden Pier with Submerged Pilings
+        // Pier & Submerged Pilings
         for (let x = -16; x <= -6; x++) {
             for (let z = 10; z <= 32; z++) {
-                addVoxel(x, 2, z, 0x9e734c); // Pier deck
+                addVoxel(x, 2, z, 0x9e734c);
                 if (z % 6 === 0 && (x === -16 || x === -6)) {
                     for (let py = -8; py <= 1; py++) {
-                        // Submerged pilings with algae tint at bottom
                         addVoxel(x, py, z, py < 0 ? 0x2e3b2e : 0x4a3725);
                     }
                 }
             }
         }
-
-        // Lamp post on pier
-        for (let ly = 3; ly <= 16; ly++) {
-            addVoxel(-11, ly, 22, 0x22272e);
-        }
+        for (let ly = 3; ly <= 16; ly++) addVoxel(-11, ly, 22, 0x22272e);
         addVoxel(-11, 17, 22, 0xffe680);
 
-        // C) Seaside House
+        // Seaside House
         const HX = -22, HZ = -14;
         for (let x = 0; x <= 26; x++) {
             for (let z = 0; z <= 22; z++) {
@@ -298,7 +286,6 @@
                     const isOuterWall = (x === 0 || x === 26 || z === 0 || z === 22);
                     const isFrontWindow = (z === 22 && y >= 5 && y <= 10 && ((x >= 5 && x <= 10) || (x >= 16 && x <= 21)));
                     const isSideWindow = (x === 26 && y >= 6 && y <= 10 && (z >= 7 && z <= 12));
-
                     if (isFrontWindow || isSideWindow) {
                         const isBorder = (y === 5 || y === 6 || y === 10 || x === 5 || x === 10 || x === 16 || x === 21 || z === 7 || z === 12);
                         if (isBorder) addVoxel(HX + x, y, HZ + z, 0xffffff);
@@ -311,50 +298,36 @@
                 const distFromRidge = Math.abs(z - 11);
                 const roofY = roofPeak - Math.floor(distFromRidge * 0.72);
                 for (let y = 16; y <= roofY; y++) {
-                    if (y === roofY || x === 0 || x === 26) {
-                        addVoxel(HX + x, y, HZ + z, 0xaf5333);
-                    }
+                    if (y === roofY || x === 0 || x === 26) addVoxel(HX + x, y, HZ + z, 0xaf5333);
                 }
             }
         }
 
-        // D) Yellow Fishing Boat (Hull extends underwater!)
+        // Yellow Boat with Submerged Red Keel
         const BX = 12, BZ = 0;
         for (let l = -24; l <= 24; l++) {
             const taper = Math.max(0.3, 1.0 - Math.pow(Math.abs(l) / 26, 2));
             const width = Math.floor(9 * taper);
-
             for (let w = -width; w <= width; w++) {
-                for (let h = -6; h <= 8; h++) { // -6 to 0 is submerged in water!
+                for (let h = -6; h <= 8; h++) {
                     const isHull = (Math.abs(w) === width || h === -6 || l === -24 || l === 24);
                     if (isHull) {
-                        if (h <= 0) {
-                            addVoxel(BX + w, h, BZ + l, 0xa62b21); // Submerged red anti-fouling hull!
-                        } else if (h <= 5) {
-                            addVoxel(BX + w, h, BZ + l, 0xdf9322); // Yellow topside hull
-                        } else {
-                            addVoxel(BX + w, h, BZ + l, 0x242a30); // Deck coaming
-                        }
+                        if (h <= 0) addVoxel(BX + w, h, BZ + l, 0xa62b21);
+                        else if (h <= 5) addVoxel(BX + w, h, BZ + l, 0xdf9322);
+                        else addVoxel(BX + w, h, BZ + l, 0x242a30);
                     } else if (h === 5) {
-                        addVoxel(BX + w, h, BZ + l, 0x828b94); // Deck floor
+                        addVoxel(BX + w, h, BZ + l, 0x828b94);
                     }
-
-                    // Cabin
                     if (l >= -8 && l <= 6 && Math.abs(w) <= 6 && h >= 6 && h <= 15) {
                         const isCabinWall = (l === -8 || l === 6 || Math.abs(w) === 6 || h === 15);
                         if (isCabinWall) {
-                            if (h >= 10 && h <= 12 && (l === -8 || Math.abs(w) === 6)) {
-                                addVoxel(BX + w, h, BZ + l, 0x3d667a);
-                            } else {
-                                addVoxel(BX + w, h, BZ + l, 0xf2f4f7);
-                            }
+                            if (h >= 10 && h <= 12 && (l === -8 || Math.abs(w) === 6)) addVoxel(BX + w, h, BZ + l, 0x3d667a);
+                            else addVoxel(BX + w, h, BZ + l, 0xf2f4f7);
                         }
                     }
                 }
             }
         }
-
-        // Boat Mast and Boom
         for (let my = 15; my <= 32; my++) addVoxel(BX, my, BZ - 8, 0xf0f3f6);
         for (let cy = 0; cy <= 14; cy++) addVoxel(BX + Math.floor(cy * 0.4), 16 + cy, BZ + 1 + cy, 0x7a858e);
 
@@ -362,20 +335,20 @@
         instancedVoxels.instanceMatrix.needsUpdate = true;
         if (instancedVoxels.instanceColor) instancedVoxels.instanceColor.needsUpdate = true;
 
-        // 6. Photorealistic 5-Layer Water Shader (Displaced, Transmission, Beer-Lambert Volume, Caustics, Foam)
+        // 6. Unity 6 / Tessendorf Ocean Shader (8-Octave Gerstner, Jacobian Whitecaps & Subsurface Scattering)
         const WATER_LEVEL = 0.0;
-        const waterGeo = new THREE.PlaneGeometry(160, 160, 200, 200);
-        waterGeo.rotateX(-Math.PI / 2);
+        const oceanGeo = new THREE.PlaneGeometry(240, 240, 280, 280);
+        oceanGeo.rotateX(-Math.PI / 2);
 
-        const waterMaterial = new THREE.ShaderMaterial({
+        const oceanMaterial = new THREE.ShaderMaterial({
             uniforms: {
                 uTime: { value: 0 },
                 uSunDir: { value: sun.clone().normalize() },
-                uSunColor: { value: new THREE.Color(0xfff1db) },
-                uWaterDeep: { value: new THREE.Color(0x06283b) },    // Deep oceanic teal
-                uWaterShallow: { value: new THREE.Color(0x1e8a9d) }, // Turquoise shallow
-                uFoamColor: { value: new THREE.Color(0xf5fbff) },
-                uCausticsTex: { value: causticsTexture },
+                uSunColor: { value: new THREE.Color(0xfff3e3) },
+                uDeepColor: { value: new THREE.Color(0x021626) },      // Abyssal deep navy (Screenshot_41)
+                uScatterColor: { value: new THREE.Color(0x0b788a) },   // SSS turquoise glow on wave peaks
+                uFoamColor: { value: new THREE.Color(0xf5fbff) },      // Whitecaps froth
+                uFoamTex: { value: foamTexture },
                 uCameraPos: { value: camera.position },
                 uIsUnderwater: { value: 0.0 }
             },
@@ -384,33 +357,80 @@
                 varying vec3 vWorldPos;
                 varying vec3 vNormal;
                 varying vec2 vUv;
+                varying float vFoam;
+                varying float vWavePeak;
 
-                // Gerstner Wave Formula
-                vec3 gerstner(vec2 pos, vec2 dir, float steepness, float wavelength, float speed) {
-                    float k = 6.2831853 / wavelength;
-                    float c = sqrt(9.81 / k);
-                    vec2 d = normalize(dir);
-                    float f = k * (dot(d, pos) - c * speed * uTime);
-                    float a = steepness / k;
-                    return vec3(d.x * (a * cos(f)), a * sin(f), d.y * (a * cos(f)));
-                }
+                struct Wave {
+                    vec2 dir;
+                    float amplitude;
+                    float wavelength;
+                    float speed;
+                    float steepness;
+                };
 
                 void main() {
                     vUv = uv;
                     vec3 p = position;
 
-                    // 4 Interactive Gerstner Waves
-                    vec3 w1 = gerstner(p.xz, vec2(1.0, 0.25), 0.16, 12.0, 0.85);
-                    vec3 w2 = gerstner(p.xz, vec2(-0.6, 0.8), 0.12, 6.5, 1.1);
-                    vec3 w3 = gerstner(p.xz, vec2(0.3, -0.9), 0.08, 3.2, 1.4);
-                    vec3 w4 = gerstner(p.xz, vec2(0.8, 0.6), 0.05, 1.6, 1.9);
+                    // 8-Octave Cascaded Wave Spectrum (Unity 6 / Phillips Model)
+                    Wave waves[8];
+                    waves[0] = Wave(vec2(1.0, 0.2),   0.28, 18.0, 0.85, 0.65);
+                    waves[1] = Wave(vec2(-0.7, 0.7),  0.18, 9.5,  1.10, 0.60);
+                    waves[2] = Wave(vec2(0.4, -0.9),  0.12, 5.2,  1.40, 0.55);
+                    waves[3] = Wave(vec2(-0.8, -0.6), 0.08, 3.0,  1.80, 0.50);
+                    waves[4] = Wave(vec2(0.9, 0.4),   0.05, 1.8,  2.20, 0.45);
+                    waves[5] = Wave(vec2(-0.3, 0.95), 0.03, 1.1,  2.70, 0.40);
+                    waves[6] = Wave(vec2(0.7, -0.7),  0.02, 0.65, 3.30, 0.35);
+                    waves[7] = Wave(vec2(-0.5, -0.85),0.012,0.38, 4.10, 0.30);
 
-                    p += w1 + w2 + w3 + w4;
+                    vec3 displacement = vec3(0.0);
+                    float Jxx = 1.0;
+                    float Jzz = 1.0;
+                    float Jxz = 0.0;
 
-                    // Wave normal computation via finite differences
-                    float delta = 0.08;
-                    vec3 pX = p + gerstner(p.xz + vec2(delta, 0.0), vec2(1.0, 0.25), 0.16, 12.0, 0.85) - w1;
-                    vec3 pZ = p + gerstner(p.xz + vec2(0.0, delta), vec2(1.0, 0.25), 0.16, 12.0, 0.85) - w1;
+                    for (int i = 0; i < 8; i++) {
+                        float k = 6.2831853 / waves[i].wavelength;
+                        float w = sqrt(9.81 * k) * waves[i].speed;
+                        vec2 d = normalize(waves[i].dir);
+                        float phase = k * dot(d, p.xz) - w * uTime;
+                        float a = waves[i].amplitude;
+                        float q = waves[i].steepness / (k * a * 8.0);
+
+                        float cosPhase = cos(phase);
+                        float sinPhase = sin(phase);
+
+                        // Horizontal Pinch Displacement (makes crests sharp and peaks narrow)
+                        displacement.x += q * a * d.x * cosPhase;
+                        displacement.z += q * a * d.y * cosPhase;
+                        displacement.y += a * sinPhase;
+
+                        // Jacobian Derivatives for Whitecaps Foam Detection
+                        float WA = k * a;
+                        Jxx -= q * WA * d.x * d.x * sinPhase;
+                        Jzz -= q * WA * d.y * d.y * sinPhase;
+                        Jxz -= q * WA * d.x * d.y * sinPhase;
+                    }
+
+                    p += displacement;
+
+                    // Jacobian Determinant: J < 0.55 indicates wave is breaking / folding over into white foam!
+                    float jacobian = Jxx * Jzz - Jxz * Jxz;
+                    vFoam = clamp((0.68 - jacobian) * 3.2, 0.0, 1.0);
+                    vWavePeak = clamp(displacement.y * 1.5, 0.0, 1.0);
+
+                    // Normal Calculation via finite differences
+                    float delta = 0.06;
+                    vec3 pX = p + vec3(delta, 0.0, 0.0);
+                    vec3 pZ = p + vec3(0.0, 0.0, delta);
+                    for (int i = 0; i < 4; i++) {
+                        float k = 6.2831853 / waves[i].wavelength;
+                        float w = sqrt(9.81 * k) * waves[i].speed;
+                        vec2 d = normalize(waves[i].dir);
+                        float phaseX = k * dot(d, pX.xz) - w * uTime;
+                        float phaseZ = k * dot(d, pZ.xz) - w * uTime;
+                        pX.y += waves[i].amplitude * sin(phaseX);
+                        pZ.y += waves[i].amplitude * sin(phaseZ);
+                    }
                     vNormal = normalize(cross(pZ - p, pX - p));
 
                     vWorldPos = (modelMatrix * vec4(p, 1.0)).xyz;
@@ -421,74 +441,81 @@
                 uniform float uTime;
                 uniform vec3 uSunDir;
                 uniform vec3 uSunColor;
-                uniform vec3 uWaterDeep;
-                uniform vec3 uWaterShallow;
+                uniform vec3 uDeepColor;
+                uniform vec3 uScatterColor;
                 uniform vec3 uFoamColor;
-                uniform sampler2D uCausticsTex;
+                uniform sampler2D uFoamTex;
                 uniform vec3 uCameraPos;
                 uniform float uIsUnderwater;
 
                 varying vec3 vWorldPos;
                 varying vec3 vNormal;
                 varying vec2 vUv;
+                varying float vFoam;
+                varying float vWavePeak;
 
                 void main() {
                     vec3 viewDir = normalize(uCameraPos - vWorldPos);
                     vec3 N = normalize(vNormal);
-                    if (uIsUnderwater > 0.5) N = -N; // Flip normal if viewed from below
+                    if (uIsUnderwater > 0.5) N = -N;
 
-                    // 1. Schlick Fresnel Reflectance
-                    float F0 = 0.02; // Water refraction index n=1.33
-                    float fresnel = F0 + (1.0 - F0) * pow(1.0 - max(dot(N, viewDir), 0.0), 5.0);
+                    // 1. Schlick Fresnel
+                    float F0 = 0.02;
+                    float NdotV = max(dot(N, viewDir), 0.0);
+                    float fresnel = F0 + (1.0 - F0) * pow(1.0 - NdotV, 5.0);
 
-                    // 2. Physical Transmission & Beer-Lambert Volume Absorption
-                    // Water depth gradient: deep teal vs shallow turquoise
-                    vec3 waterColor = mix(uWaterShallow, uWaterDeep, smoothstep(-0.2, 0.4, vWorldPos.y));
+                    // 2. Subsurface Scattering (SSS): Waves glow translucent turquoise when backlit
+                    vec3 backLightDir = normalize(-uSunDir + N * 0.4);
+                    float SSS = pow(max(dot(viewDir, backLightDir), 0.0), 3.5) * vWavePeak;
+                    vec3 waterBody = mix(uDeepColor, uScatterColor, SSS * 0.8 + vWavePeak * 0.35);
 
-                    // 3. Sun Specular Glints (Blinn-Phong)
+                    // 3. Sun Specular Glitter (Blinn-Phong + anisotropic highlights)
                     vec3 H = normalize(uSunDir + viewDir);
-                    float spec = pow(max(dot(N, H), 0.0), 220.0) * 3.6;
-                    vec3 sunSpecular = uSunColor * spec;
+                    float specSharp = pow(max(dot(N, H), 0.0), 280.0) * 4.2;
+                    float specWide = pow(max(dot(N, H), 0.0), 40.0) * 0.8;
+                    vec3 sunSpecular = uSunColor * (specSharp + specWide);
 
                     // 4. Sky Reflection
-                    vec3 skyRefl = mix(vec3(0.55, 0.68, 0.88), vec3(0.12, 0.32, 0.62), max(reflect(-viewDir, N).y, 0.0));
+                    vec3 skyRefl = mix(vec3(0.5, 0.65, 0.85), vec3(0.1, 0.28, 0.58), max(reflect(-viewDir, N).y, 0.0));
 
-                    // 5. Dynamic Caustics Network
-                    vec2 causticsUv1 = vWorldPos.xz * 0.12 + vec2(uTime * 0.04, uTime * 0.03);
-                    vec2 causticsUv2 = vWorldPos.xz * 0.15 - vec2(uTime * 0.03, -uTime * 0.04);
-                    vec3 causticSample = texture2D(uCausticsTex, causticsUv1).rgb * texture2D(uCausticsTex, causticsUv2).rgb * 2.0;
+                    // Base ocean color combining SSS volume & Sky reflection
+                    vec3 finalCol = mix(waterBody, skyRefl, fresnel) + sunSpecular;
 
-                    // Blend Surface Transmission with Sky Reflection & Caustics
-                    vec3 finalCol = mix(waterColor + causticSample * 0.25, skyRefl, fresnel) + sunSpecular;
+                    // 5. Jacobian Whitecaps Foam (Matching Screenshot_41)
+                    // High-frequency animated foam noise
+                    vec2 foamUV1 = vWorldPos.xz * 0.25 + vec2(uTime * 0.05, uTime * 0.03);
+                    vec2 foamUV2 = vWorldPos.xz * 0.40 - vec2(uTime * 0.04, -uTime * 0.05);
+                    float foamPattern = texture2D(uFoamTex, foamUV1).r * 0.6 + texture2D(uFoamTex, foamUV2).r * 0.4;
 
-                    // 6. Realistic Wave Crest Foam
-                    if (vWorldPos.y > 0.38) {
-                        float foamFactor = smoothstep(0.38, 0.55, vWorldPos.y);
-                        finalCol = mix(finalCol, uFoamColor, foamFactor * 0.85);
+                    float whitecap = smoothstep(0.18, 0.65, vFoam * foamPattern);
+                    // Also foam on high crests
+                    if (vWorldPos.y > 0.35) {
+                        whitecap = max(whitecap, smoothstep(0.35, 0.52, vWorldPos.y) * foamPattern);
                     }
 
-                    // Transmission Alpha: 0.82 allows seabed, hull and pilings to be clearly seen!
-                    gl_FragColor = vec4(finalCol, 0.84);
+                    finalCol = mix(finalCol, uFoamColor, whitecap * 0.95);
+
+                    // Transmission Alpha: allows seeing submerged hull and seabed when looking down
+                    gl_FragColor = vec4(finalCol, mix(0.85, 0.98, whitecap));
                 }
             `,
             transparent: true,
-            side: THREE.DoubleSide, // Visible both above and underwater!
+            side: THREE.DoubleSide,
             depthWrite: false
         });
 
-        const waterMesh = new THREE.Mesh(waterGeo, waterMaterial);
-        waterMesh.position.y = WATER_LEVEL;
-        scene.add(waterMesh);
+        const oceanMesh = new THREE.Mesh(oceanGeo, oceanMaterial);
+        oceanMesh.position.y = WATER_LEVEL;
+        scene.add(oceanMesh);
 
-        // 7. Surface Foam & Splash Particles System
-        const foamCount = 450;
+        // 7. Surface Spray / Foam Clusters
+        const foamCount = 500;
         const foamGeo = new THREE.BufferGeometry();
         const foamPos = new Float32Array(foamCount * 3);
         const foamScales = new Float32Array(foamCount);
         const foamData = [];
 
         for (let i = 0; i < foamCount; i++) {
-            // Cluster foam around boat hull and pier pilings
             const isBoat = (i % 2 === 0);
             const bx = isBoat ? (12 + (Math.random() - 0.5) * 8) : (-11 + (Math.random() - 0.5) * 5);
             const bz = isBoat ? ((Math.random() - 0.5) * 16) : (12 + Math.random() * 18);
@@ -498,43 +525,25 @@
             foamPos[i * 3 + 2] = bz;
             foamScales[i] = Math.random() * 0.4 + 0.2;
 
-            foamData.push({
-                baseX: bx,
-                baseZ: bz,
-                driftSpeed: Math.random() * 0.4 + 0.2,
-                phase: Math.random() * Math.PI * 2
-            });
+            foamData.push({ baseX: bx, baseZ: bz, driftSpeed: Math.random() * 0.4 + 0.2, phase: Math.random() * Math.PI * 2 });
         }
-
         foamGeo.setAttribute('position', new THREE.BufferAttribute(foamPos, 3));
         foamGeo.setAttribute('scale', new THREE.BufferAttribute(foamScales, 1));
 
         const foamMat = new THREE.ShaderMaterial({
             vertexShader: `
                 attribute float scale;
-                void main() {
-                    vec4 mv = viewMatrix * vec4(position, 1.0);
-                    gl_PointSize = (scale * 32.0) * (18.0 / -mv.z);
-                    gl_Position = projectionMatrix * mv;
-                }
+                void main() { vec4 mv = viewMatrix * vec4(position, 1.0); gl_PointSize = (scale * 32.0) * (18.0 / -mv.z); gl_Position = projectionMatrix * mv; }
             `,
             fragmentShader: `
-                void main() {
-                    float d = length(gl_PointCoord - vec2(0.5));
-                    if (d > 0.5) discard;
-                    float soft = smoothstep(0.5, 0.1, d);
-                    // Soft sea foam cluster
-                    gl_FragColor = vec4(0.96, 0.98, 1.0, 0.75 * soft);
-                }
+                void main() { float d = length(gl_PointCoord - vec2(0.5)); if (d > 0.5) discard; gl_FragColor = vec4(0.96, 0.98, 1.0, 0.75 * smoothstep(0.5, 0.1, d)); }
             `,
-            transparent: true,
-            depthWrite: false
+            transparent: true, depthWrite: false
         });
-
         const foamPoints = new THREE.Points(foamGeo, foamMat);
         scene.add(foamPoints);
 
-        // 8. Underwater Suspended Micro-Particles (Plankton, Bubbles & Light Shafts)
+        // 8. Underwater Plankton & Micro-Bubbles
         const bubbleCount = 350;
         const bubbleGeo = new THREE.BufferGeometry();
         const bubblePos = new Float32Array(bubbleCount * 3);
@@ -542,39 +551,21 @@
 
         for (let i = 0; i < bubbleCount; i++) {
             const x = (Math.random() - 0.5) * 35;
-            const y = -Math.random() * 7 - 0.2; // Submerged depth
+            const y = -Math.random() * 7 - 0.2;
             const z = (Math.random() - 0.5) * 35;
-
-            bubblePos[i * 3 + 0] = x;
-            bubblePos[i * 3 + 1] = y;
-            bubblePos[i * 3 + 2] = z;
-
-            bubbleData.push({
-                x, y, z,
-                riseSpeed: Math.random() * 0.6 + 0.2,
-                wobble: Math.random() * Math.PI * 2
-            });
+            bubblePos[i * 3 + 0] = x; bubblePos[i * 3 + 1] = y; bubblePos[i * 3 + 2] = z;
+            bubbleData.push({ x, y, z, riseSpeed: Math.random() * 0.6 + 0.2, wobble: Math.random() * Math.PI * 2 });
         }
         bubbleGeo.setAttribute('position', new THREE.BufferAttribute(bubblePos, 3));
 
         const bubbleMat = new THREE.ShaderMaterial({
             vertexShader: `
-                void main() {
-                    vec4 mv = viewMatrix * vec4(position, 1.0);
-                    gl_PointSize = 18.0 * (15.0 / -mv.z);
-                    gl_Position = projectionMatrix * mv;
-                }
+                void main() { vec4 mv = viewMatrix * vec4(position, 1.0); gl_PointSize = 18.0 * (15.0 / -mv.z); gl_Position = projectionMatrix * mv; }
             `,
             fragmentShader: `
-                void main() {
-                    float d = length(gl_PointCoord - vec2(0.5));
-                    if (d > 0.5) discard;
-                    float ring = smoothstep(0.5, 0.4, d) * smoothstep(0.1, 0.35, d);
-                    gl_FragColor = vec4(0.6, 0.9, 1.0, ring * 0.75);
-                }
+                void main() { float d = length(gl_PointCoord - vec2(0.5)); if (d > 0.5) discard; float ring = smoothstep(0.5, 0.4, d) * smoothstep(0.1, 0.35, d); gl_FragColor = vec4(0.6, 0.9, 1.0, ring * 0.75); }
             `,
-            transparent: true,
-            depthWrite: false
+            transparent: true, depthWrite: false
         });
         const bubblePoints = new THREE.Points(bubbleGeo, bubbleMat);
         scene.add(bubblePoints);
@@ -637,45 +628,26 @@
             const positions = new Float32Array(count * 3);
             const pData = [];
             for (let i = 0; i < count; i++) {
-                positions[i * 3 + 0] = pos.x;
-                positions[i * 3 + 1] = pos.y;
-                positions[i * 3 + 2] = pos.z;
+                positions[i * 3 + 0] = pos.x; positions[i * 3 + 1] = pos.y; positions[i * 3 + 2] = pos.z;
                 const isSmoke = i > 120;
                 pData.push({
-                    basePos: pos.clone(),
-                    pos: pos.clone(),
+                    basePos: pos.clone(), pos: pos.clone(),
                     vel: new THREE.Vector3((Math.random()-0.5)*(isSmoke?1.5:0.6), Math.random()*(isSmoke?3.0:4.5)+1.2, (Math.random()-0.5)*(isSmoke?1.5:0.6)),
-                    age: Math.random() * 2.0,
-                    maxAge: isSmoke ? (2.8 + Math.random() * 1.6) : (0.6 + Math.random() * 0.4),
-                    isSmoke
+                    age: Math.random() * 2.0, maxAge: isSmoke ? (2.8 + Math.random() * 1.6) : (0.6 + Math.random() * 0.4), isSmoke
                 });
             }
             geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 
             const mat = new THREE.ShaderMaterial({
                 vertexShader: `
-                    attribute float aAge; attribute float aIsSmoke;
-                    varying float vAge; varying float vIsSmoke;
-                    void main() {
-                        vAge = aAge; vIsSmoke = aIsSmoke;
-                        vec4 mv = viewMatrix * vec4(position, 1.0);
-                        gl_PointSize = (vIsSmoke > 0.5 ? 54.0 : 26.0) * (20.0 / -mv.z);
-                        gl_Position = projectionMatrix * mv;
-                    }
+                    attribute float aAge; attribute float aIsSmoke; varying float vAge; varying float vIsSmoke;
+                    void main() { vAge = aAge; vIsSmoke = aIsSmoke; vec4 mv = viewMatrix * vec4(position, 1.0); gl_PointSize = (vIsSmoke > 0.5 ? 54.0 : 26.0) * (20.0 / -mv.z); gl_Position = projectionMatrix * mv; }
                 `,
                 fragmentShader: `
                     varying float vAge; varying float vIsSmoke;
-                    void main() {
-                        float d = length(gl_PointCoord - vec2(0.5));
-                        if (d > 0.5) discard;
-                        float soft = smoothstep(0.5, 0.08, d);
-                        if (vIsSmoke > 0.5) {
-                            gl_FragColor = vec4(vec3(0.09, 0.09, 0.1), (1.0 - vAge) * 0.45 * soft);
-                        } else {
-                            vec3 col = mix(vec3(1.0, 0.95, 0.6), vec3(1.0, 0.35, 0.02), vAge * 1.4);
-                            col = mix(col, vec3(0.8, 0.08, 0.01), smoothstep(0.4, 1.0, vAge));
-                            gl_FragColor = vec4(col * 2.6, (1.0 - vAge) * soft);
-                        }
+                    void main() { float d = length(gl_PointCoord - vec2(0.5)); if (d > 0.5) discard; float soft = smoothstep(0.5, 0.08, d);
+                        if (vIsSmoke > 0.5) gl_FragColor = vec4(vec3(0.09, 0.09, 0.1), (1.0 - vAge) * 0.45 * soft);
+                        else { vec3 col = mix(vec3(1.0, 0.95, 0.6), vec3(1.0, 0.35, 0.02), vAge * 1.4); col = mix(col, vec3(0.8, 0.08, 0.01), smoothstep(0.4, 1.0, vAge)); gl_FragColor = vec4(col * 2.6, (1.0 - vAge) * soft); }
                     }
                 `,
                 transparent: true, depthWrite: false
@@ -690,7 +662,7 @@
         }
         createFireSite(new THREE.Vector3(BX, 3.0, BZ - 3));
 
-        // Extinguisher Spray
+        // Extinguisher
         const sprayParticles = [];
         const sprayGeo = new THREE.BufferGeometry();
         const MAX_SPRAY = 600;
@@ -727,7 +699,7 @@
             }
         }
 
-        // 10. Raycasting & Interaction
+        // 10. Interaction
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
 
@@ -739,7 +711,7 @@
             mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
             raycaster.setFromCamera(mouse, camera);
 
-            const intersects = raycaster.intersectObjects([instancedVoxels, waterMesh]);
+            const intersects = raycaster.intersectObjects([instancedVoxels, oceanMesh]);
             if (intersects.length > 0) {
                 const hit = intersects[0];
                 if (currentTool === 'hammer') explodeVoxelsAt(hit.point, 2.2);
@@ -753,13 +725,13 @@
             mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
             mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
             raycaster.setFromCamera(mouse, camera);
-            const intersects = raycaster.intersectObjects([instancedVoxels, waterMesh]);
+            const intersects = raycaster.intersectObjects([instancedVoxels, oceanMesh]);
             if (intersects.length > 0) emitExtinguisherSpray(camera.position, intersects[0].point);
         });
 
         window.addEventListener('pointerup', () => { isSpraying = false; });
 
-        // 11. Main Animation & Underwater State Transition Loop
+        // 11. Main Loop & Underwater Handling
         const clock = new THREE.Clock();
         const underwaterOverlay = document.getElementById('underwater-overlay');
         const statusText = document.getElementById('status-text');
@@ -770,32 +742,29 @@
             const delta = Math.min(clock.getDelta(), 0.1);
             const time = clock.getElapsedTime();
 
-            // Check if Camera is Underwater!
             const isUnderwater = (camera.position.y < WATER_LEVEL);
-            waterMaterial.uniforms.uTime.value = time;
-            waterMaterial.uniforms.uCameraPos.value.copy(camera.position);
-            waterMaterial.uniforms.uIsUnderwater.value = isUnderwater ? 1.0 : 0.0;
+            oceanMaterial.uniforms.uTime.value = time;
+            oceanMaterial.uniforms.uCameraPos.value.copy(camera.position);
+            oceanMaterial.uniforms.uIsUnderwater.value = isUnderwater ? 1.0 : 0.0;
 
             if (isUnderwater !== wasUnderwater) {
                 wasUnderwater = isUnderwater;
                 if (isUnderwater) {
-                    // Sualtı modu: Yoğun bulanık sis, derin okyanus tonu
                     scene.fog.color.copy(underwaterFogColor);
-                    scene.fog.density = 0.055; // Sualtı bulanıklığı
+                    scene.fog.density = 0.055;
                     underwaterOverlay.style.opacity = '1';
                     statusText.innerText = "🌊 Sualtı (Underwater - Murky Fog & Bubbles)";
                     statusText.parentElement.style.borderColor = '#0284c7';
                 } else {
-                    // Su üstü modu: Normal atmosferik gün batımı sisi
                     scene.fog.color.copy(surfaceFogColor);
                     scene.fog.density = 0.012;
                     underwaterOverlay.style.opacity = '0';
-                    statusText.innerText = "Su Üstü (Surface)";
-                    statusText.parentElement.style.borderColor = 'rgba(56, 189, 248, 0.3)';
+                    statusText.innerText = "Okyanus Yüzeyi (Surface)";
+                    statusText.parentElement.style.borderColor = 'rgba(56, 189, 248, 0.4)';
                 }
             }
 
-            // Animate Surface Foam Particles (Drifting with water current)
+            // Foam animation
             const fPosArr = foamGeo.attributes.position.array;
             for (let i = 0; i < foamCount; i++) {
                 const fd = foamData[i];
@@ -805,45 +774,33 @@
             }
             foamGeo.attributes.position.needsUpdate = true;
 
-            // Animate Underwater Micro-bubbles / Plankton (Rising upward)
+            // Underwater bubbles
             const bPosArr = bubbleGeo.attributes.position.array;
             for (let i = 0; i < bubbleCount; i++) {
                 const bd = bubbleData[i];
                 bd.y += bd.riseSpeed * delta;
                 bd.wobble += delta * 2.0;
-                if (bd.y > WATER_LEVEL - 0.1) {
-                    bd.y = -7.5 - Math.random() * 2.0; // Reset to seabed
-                }
+                if (bd.y > WATER_LEVEL - 0.1) bd.y = -7.5 - Math.random() * 2.0;
                 bPosArr[i * 3 + 0] = bd.x + Math.sin(bd.wobble) * 0.15;
                 bPosArr[i * 3 + 1] = bd.y;
                 bPosArr[i * 3 + 2] = bd.z + Math.cos(bd.wobble) * 0.15;
             }
             bubbleGeo.attributes.position.needsUpdate = true;
 
-            // Animate Debris Physics (Splashing, floating & sinking)
+            // Debris Physics
             for (let i = debrisPool.length - 1; i >= 0; i--) {
                 const d = debrisPool[i];
                 d.life -= delta;
-                if (d.life <= 0) {
-                    scene.remove(d.mesh);
-                    debrisPool.splice(i, 1);
-                    continue;
-                }
+                if (d.life <= 0) { scene.remove(d.mesh); debrisPool.splice(i, 1); continue; }
                 const inWater = (d.mesh.position.y < WATER_LEVEL);
-                // In water: high drag and slow sinking buoyancy
-                if (inWater) {
-                    d.vel.y -= 3.5 * delta; // Slow underwater sinking
-                    d.vel.x *= 0.94;
-                    d.vel.z *= 0.94;
-                } else {
-                    d.vel.y -= 19.0 * delta; // Air gravity
-                }
+                if (inWater) { d.vel.y -= 3.5 * delta; d.vel.x *= 0.94; d.vel.z *= 0.94; }
+                else { d.vel.y -= 19.0 * delta; }
                 d.mesh.position.addScaledVector(d.vel, delta);
                 d.mesh.rotation.x += d.rot.x * delta;
                 d.mesh.rotation.y += d.rot.y * delta;
             }
 
-            // Animate Fire & Smoke
+            // Fire Sites
             for (const site of combustionSites) {
                 if (!site.active) continue;
                 const posArr = site.geo.attributes.position.array;
@@ -852,10 +809,7 @@
                 for (let i = 0; i < site.count; i++) {
                     const p = site.pData[i];
                     p.age += delta;
-                    if (p.age >= p.maxAge) {
-                        p.age = 0; p.pos.copy(p.basePos);
-                        p.pos.x += (Math.random()-0.5)*0.5; p.pos.z += (Math.random()-0.5)*0.5;
-                    }
+                    if (p.age >= p.maxAge) { p.age = 0; p.pos.copy(p.basePos); p.pos.x += (Math.random()-0.5)*0.5; p.pos.z += (Math.random()-0.5)*0.5; }
                     p.pos.addScaledVector(p.vel, delta);
                     posArr[i * 3 + 0] = p.pos.x; posArr[i * 3 + 1] = p.pos.y; posArr[i * 3 + 2] = p.pos.z;
                     ages[i] = p.age / p.maxAge; isSmokes[i] = p.isSmoke ? 1.0 : 0.0;
@@ -866,7 +820,7 @@
                 site.light.intensity = 4.2 + Math.sin(time * 22.0) * 0.8;
             }
 
-            // Animate Extinguisher Mist
+            // Extinguisher Mist
             const sPosArr = sprayPositions;
             const sprayLives = new Float32Array(sprayParticles.length);
             for (let i = sprayParticles.length - 1; i >= 0; i--) {
