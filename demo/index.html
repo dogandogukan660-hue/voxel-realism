@@ -3,17 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Unity 6 / Tessendorf Ocean Water & Voxel Engine</title>
+    <title>Crystal-Clear Ocean Water & Voxel Engine (Evan Wallace Style)</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { overflow: hidden; background: #02050b; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { overflow: hidden; background: #030a16; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
         #canvas-container { width: 100vw; height: 100vh; display: block; }
         #hud {
             position: absolute; top: 18px; left: 18px;
-            background: rgba(6, 11, 20, 0.88); backdrop-filter: blur(14px);
-            border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 12px;
-            padding: 16px 22px; color: #f1f5f9; max-width: 400px; pointer-events: none;
-            box-shadow: 0 16px 45px rgba(0,0,0,0.75);
+            background: rgba(7, 18, 34, 0.88); backdrop-filter: blur(14px);
+            border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 12px;
+            padding: 16px 22px; color: #f1f5f9; max-width: 410px; pointer-events: none;
+            box-shadow: 0 16px 45px rgba(0,0,0,0.65);
         }
         #hud h1 { font-size: 1.2rem; font-weight: 700; color: #38bdf8; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
         #hud p { font-size: 0.83rem; color: #94a3b8; line-height: 1.45; margin-bottom: 10px; }
@@ -24,23 +24,27 @@
         .controls-hint span { color: #f59e0b; font-weight: 600; min-width: 95px; display: inline-block; }
         #water-status {
             position: absolute; top: 18px; right: 18px;
-            background: rgba(6, 11, 20, 0.88); backdrop-filter: blur(10px);
+            background: rgba(7, 18, 34, 0.88); backdrop-filter: blur(10px);
             border: 1px solid rgba(56, 189, 248, 0.4); border-radius: 20px;
             padding: 8px 16px; color: #38bdf8; font-size: 0.82rem; font-weight: 600;
             display: flex; align-items: center; gap: 8px;
         }
         #water-status .indicator { width: 8px; height: 8px; border-radius: 50%; background: #38bdf8; box-shadow: 0 0 12px #38bdf8; }
-        #underwater-overlay {
+
+        /* Sualtı Gerçekçi Bulanıklık & Dalgalı Kırılma Efekti (SVG Displacement + Backdrop Blur) */
+        #underwater-filter-layer {
             position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
-            pointer-events: none; opacity: 0; transition: opacity 0.3s ease;
-            background: radial-gradient(circle at center, rgba(3, 40, 62, 0.45) 0%, rgba(1, 15, 28, 0.9) 100%);
-            mix-blend-mode: multiply;
+            pointer-events: none; opacity: 0; transition: opacity 0.35s ease;
+            backdrop-filter: blur(8px) contrast(1.08) brightness(1.05);
+            background: radial-gradient(circle at center, rgba(14, 165, 233, 0.12) 0%, rgba(2, 75, 115, 0.35) 100%);
+            filter: url(#underwater-wave);
         }
+
         #toolbar {
             position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%);
-            display: flex; gap: 10px; background: rgba(10, 18, 32, 0.94);
-            padding: 8px 14px; border-radius: 30px; border: 1px solid rgba(56, 189, 248, 0.3);
-            backdrop-filter: blur(10px); box-shadow: 0 10px 30px rgba(0,0,0,0.7);
+            display: flex; gap: 10px; background: rgba(10, 22, 38, 0.94);
+            padding: 8px 14px; border-radius: 30px; border: 1px solid rgba(56, 189, 248, 0.35);
+            backdrop-filter: blur(10px); box-shadow: 0 10px 30px rgba(0,0,0,0.6);
         }
         .tool-btn {
             background: #1e293b; border: 1px solid #334155; color: #e2e8f0;
@@ -66,18 +70,26 @@
     </script>
 </head>
 <body>
+    <!-- SVG Wavy Refraction Filter for Underwater Screen Lens -->
+    <svg style="position: absolute; width: 0; height: 0;">
+        <filter id="underwater-wave">
+            <feTurbulence id="turb-wave" type="fractalNoise" baseFrequency="0.015 0.02" numOctaves="2" result="noise" />
+            <feDisplacementMap in="SourceGraphic" in2="noise" scale="14" xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+    </svg>
+
     <div id="hud">
-        <h1><span>🌊</span> Unity 6 Ocean Water System</h1>
-        <p>Photorealistic ocean based on Screenshot_41: 8-octave Gerstner waves with Jacobian wave-crest whitecaps, Subsurface Scattering (SSS), transmission, and dynamic foam.</p>
+        <h1><span>🌊</span> Crystal-Clear Aquatic Water Engine</h1>
+        <p>Inspired by MadeByEvan & Unity 6: Organic 3D Simplex noise waves (no repetition), crystal-clear turquoise transmission, caustic dancing, and wavy underwater refraction blur.</p>
         <div class="tag-row">
-            <span class="badge">Jacobian Whitecaps</span>
-            <span class="badge">Subsurface Scattering</span>
-            <span class="badge">Sun Glitter Anisotropy</span>
-            <span class="badge">Beer-Lambert Volume</span>
-            <span class="badge">Sualtı Modu & Sis</span>
+            <span class="badge">Crystal-Clear Turquoise</span>
+            <span class="badge">3D Fractal Noise (Organic)</span>
+            <span class="badge">Dynamic Dancing Caustics</span>
+            <span class="badge">Sualtı Dalgalı Kırılma (Blur)</span>
+            <span class="badge">Canlı Işık Saçılımı</span>
         </div>
         <div class="controls-hint">
-            <div><span>Sağ Tık + Döndür:</span> Kamerayı suyun altına sokabilirsin!</div>
+            <div><span>Sağ Tık + Döndür:</span> Kamerayı suya sok, dalgalı bulanıklığı gör!</div>
             <div><span>Sol Tık:</span> Balyoz / Ateş / Söndürücü</div>
             <div><span>Tekerlek:</span> Yakınlaş / Uzaklaş</div>
         </div>
@@ -85,10 +97,10 @@
 
     <div id="water-status">
         <span class="indicator"></span>
-        <span id="status-text">Okyanus Yüzeyi (Surface)</span>
+        <span id="status-text">Berrak Su Yüzeyi (Surface)</span>
     </div>
 
-    <div id="underwater-overlay"></div>
+    <div id="underwater-filter-layer"></div>
 
     <div id="toolbar">
         <button class="tool-btn active" id="btn-hammer" onclick="selectTool('hammer')">🔨 Balyoz / Yıkım</button>
@@ -122,9 +134,10 @@
         const container = document.getElementById('canvas-container');
         const scene = new THREE.Scene();
 
-        const surfaceFogColor = new THREE.Color(0x0a1626);
-        const underwaterFogColor = new THREE.Color(0x022033);
-        scene.fog = new THREE.FogExp2(surfaceFogColor, 0.012);
+        // Vibrant Surface and Underwater Fog (No dark black mud!)
+        const surfaceFogColor = new THREE.Color(0x0a1e36);
+        const underwaterFogColor = new THREE.Color(0x0c688c); // Luminous aquatic teal fog!
+        scene.fog = new THREE.FogExp2(surfaceFogColor, 0.009);
 
         const camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, 0.1, 1000);
         camera.position.set(0.5, 7.5, 23.0);
@@ -133,7 +146,7 @@
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        renderer.toneMappingExposure = 1.08;
+        renderer.toneMappingExposure = 1.15; // Bright, sunny exposure
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         container.appendChild(renderer.domElement);
@@ -144,35 +157,35 @@
         controls.maxPolarAngle = Math.PI * 0.95; // Full underwater navigation
         controls.minDistance = 2;
         controls.maxDistance = 90;
-        controls.target.set(0, 2.2, 0);
+        controls.target.set(0, 2.0, 0);
 
-        // 3. Sun & Atmospheric Sky
+        // 3. Bright Sunny Atmosphere & Sky
         const sky = new Sky();
         sky.scale.setScalar(10000);
         scene.add(sky);
 
         const skyUniforms = sky.material.uniforms;
-        skyUniforms['turbidity'].value = 4.0;
-        skyUniforms['rayleigh'].value = 1.8;
+        skyUniforms['turbidity'].value = 2.8;
+        skyUniforms['rayleigh'].value = 1.4;
         skyUniforms['mieCoefficient'].value = 0.005;
         skyUniforms['mieDirectionalG'].value = 0.8;
 
         const sun = new THREE.Vector3();
-        const elevation = 24.0;
+        const elevation = 32.0; // Bright sunny sky, high sun gives sparkling caustics
         const azimuth = 155.0;
         const phi = THREE.MathUtils.degToRad(90 - elevation);
         const theta = THREE.MathUtils.degToRad(azimuth);
         sun.setFromSphericalCoords(1, phi, theta);
         skyUniforms['sunPosition'].value.copy(sun);
 
-        const sunLight = new THREE.DirectionalLight(0xfff5e6, 3.4);
+        const sunLight = new THREE.DirectionalLight(0xfff7ed, 3.8);
         sunLight.position.copy(sun).multiplyScalar(80);
         sunLight.castShadow = true;
         sunLight.shadow.mapSize.width = 2048;
         sunLight.shadow.mapSize.height = 2048;
         sunLight.shadow.camera.near = 5;
         sunLight.shadow.camera.far = 160;
-        const d = 26;
+        const d = 28;
         sunLight.shadow.camera.left = -d;
         sunLight.shadow.camera.right = d;
         sunLight.shadow.camera.top = d;
@@ -180,7 +193,8 @@
         sunLight.shadow.bias = -0.0004;
         scene.add(sunLight);
 
-        const hemiLight = new THREE.HemisphereLight(0x78a5d1, 0x1f3445, 1.3);
+        // Bright Aquatic Sky Bounce (Luminous turquoise fill)
+        const hemiLight = new THREE.HemisphereLight(0x89d6fb, 0x1a6b8a, 1.4);
         scene.add(hemiLight);
 
         // Pier Lamp
@@ -189,8 +203,8 @@
         lampLight.castShadow = true;
         scene.add(lampLight);
 
-        // 4. Procedural Wind Ripples & Foam Texture Generator
-        function createOceanFoamCanvas() {
+        // 4. Procedural Dancing Caustics Canvas Texture (Evan Wallace Style)
+        function createCausticsCanvas() {
             const size = 512;
             const canvas = document.createElement('canvas');
             canvas.width = size;
@@ -200,17 +214,16 @@
             for (let y = 0; y < size; y++) {
                 for (let x = 0; x < size; x++) {
                     const idx = (y * size + x) * 4;
-                    const u = (x / size) * Math.PI * 16;
-                    const v = (y / size) * Math.PI * 16;
-                    // Fractal cellular foam pattern
-                    const n1 = Math.sin(u + Math.sin(v * 2.0)) * 0.5 + 0.5;
-                    const n2 = Math.cos(v + Math.cos(u * 2.5)) * 0.5 + 0.5;
-                    const n3 = Math.sin(u * 3.2 - v * 2.8) * 0.5 + 0.5;
-                    const foam = Math.pow(n1 * n2 * n3, 1.8) * 255;
+                    const u = (x / size) * Math.PI * 10;
+                    const v = (y / size) * Math.PI * 10;
+                    // Dual Voronoi refraction wave caustics
+                    const c1 = Math.sin(u + Math.sin(v * 1.6)) * 0.5 + 0.5;
+                    const c2 = Math.cos(v + Math.cos(u * 1.9)) * 0.5 + 0.5;
+                    const caustic = Math.pow(c1 * c2, 2.2) * 255;
 
-                    imgData.data[idx + 0] = foam;
-                    imgData.data[idx + 1] = foam * 0.98;
-                    imgData.data[idx + 2] = foam * 0.95;
+                    imgData.data[idx + 0] = caustic * 0.6;
+                    imgData.data[idx + 1] = caustic * 0.95;
+                    imgData.data[idx + 2] = caustic;
                     imgData.data[idx + 3] = 255;
                 }
             }
@@ -218,14 +231,14 @@
             return canvas;
         }
 
-        const foamTexture = new THREE.CanvasTexture(createOceanFoamCanvas());
-        foamTexture.wrapS = foamTexture.wrapT = THREE.RepeatWrapping;
-        foamTexture.repeat.set(16, 16);
+        const causticsTexture = new THREE.CanvasTexture(createCausticsCanvas());
+        causticsTexture.wrapS = causticsTexture.wrapT = THREE.RepeatWrapping;
+        causticsTexture.repeat.set(10, 10);
 
         // 5. Micro-Voxel World Construction (0.28m voxels)
         const VOXEL_SIZE = 0.28;
         const voxelGeo = new THREE.BoxGeometry(VOXEL_SIZE, VOXEL_SIZE, VOXEL_SIZE);
-        const voxelMaterial = new THREE.MeshStandardMaterial({ roughness: 0.8, metalness: 0.1, flatShading: true });
+        const voxelMaterial = new THREE.MeshStandardMaterial({ roughness: 0.75, metalness: 0.1, flatShading: true });
 
         const MAX_VOXELS = 26000;
         const instancedVoxels = new THREE.InstancedMesh(voxelGeo, voxelMaterial, MAX_VOXELS);
@@ -253,13 +266,13 @@
             voxelCount++;
         }
 
-        // Seabed (visible underwater)
+        // Seabed (Tropical sand clearly visible under the transparent water!)
         for (let x = -35; x <= 35; x += 2) {
             for (let z = -25; z <= 40; z += 2) {
                 const depth = -8 - Math.floor(Math.sin(x * 0.1) * Math.cos(z * 0.1) * 3);
                 for (let y = depth; y <= depth + 1; y++) {
                     const isSand = (x > -15 && x < 25 && z > 5);
-                    addVoxel(x, y, z, isSand ? 0xd6c29b : 0x4a545a);
+                    addVoxel(x, y, z, isSand ? 0xe2cfab : 0x5a6872); // Golden sand & coral gravel
                 }
             }
         }
@@ -267,10 +280,10 @@
         // Pier & Submerged Pilings
         for (let x = -16; x <= -6; x++) {
             for (let z = 10; z <= 32; z++) {
-                addVoxel(x, 2, z, 0x9e734c);
+                addVoxel(x, 2, z, 0xa37952);
                 if (z % 6 === 0 && (x === -16 || x === -6)) {
                     for (let py = -8; py <= 1; py++) {
-                        addVoxel(x, py, z, py < 0 ? 0x2e3b2e : 0x4a3725);
+                        addVoxel(x, py, z, py < 0 ? 0x2e483b : 0x543f2c); // Submerged algae-tinted pilings
                     }
                 }
             }
@@ -312,8 +325,8 @@
                 for (let h = -6; h <= 8; h++) {
                     const isHull = (Math.abs(w) === width || h === -6 || l === -24 || l === 24);
                     if (isHull) {
-                        if (h <= 0) addVoxel(BX + w, h, BZ + l, 0xa62b21);
-                        else if (h <= 5) addVoxel(BX + w, h, BZ + l, 0xdf9322);
+                        if (h <= 0) addVoxel(BX + w, h, BZ + l, 0xa62b21); // Submerged red anti-fouling keel
+                        else if (h <= 5) addVoxel(BX + w, h, BZ + l, 0xdf9322); // Vibrant yellow hull
                         else addVoxel(BX + w, h, BZ + l, 0x242a30);
                     } else if (h === 5) {
                         addVoxel(BX + w, h, BZ + l, 0x828b94);
@@ -335,7 +348,7 @@
         instancedVoxels.instanceMatrix.needsUpdate = true;
         if (instancedVoxels.instanceColor) instancedVoxels.instanceColor.needsUpdate = true;
 
-        // 6. Unity 6 / Tessendorf Ocean Shader (8-Octave Gerstner, Jacobian Whitecaps & Subsurface Scattering)
+        // 6. Photorealistic Water Shader with 3D Simplex Noise (MadeByEvan + Unity 6 Hybrid)
         const WATER_LEVEL = 0.0;
         const oceanGeo = new THREE.PlaneGeometry(240, 240, 280, 280);
         oceanGeo.rotateX(-Math.PI / 2);
@@ -344,11 +357,13 @@
             uniforms: {
                 uTime: { value: 0 },
                 uSunDir: { value: sun.clone().normalize() },
-                uSunColor: { value: new THREE.Color(0xfff3e3) },
-                uDeepColor: { value: new THREE.Color(0x021626) },      // Abyssal deep navy (Screenshot_41)
-                uScatterColor: { value: new THREE.Color(0x0b788a) },   // SSS turquoise glow on wave peaks
-                uFoamColor: { value: new THREE.Color(0xf5fbff) },      // Whitecaps froth
-                uFoamTex: { value: foamTexture },
+                uSunColor: { value: new THREE.Color(0xfff7ed) },
+                // Evan Wallace Style Luminous Turquoise & Azure Palettes (NOT BLACK!)
+                uDeepColor: { value: new THREE.Color(0x0a4b78) },      // Mediterranean azure
+                uShallowColor: { value: new THREE.Color(0x1ec8d8) },   // Crystal turquoise
+                uScatterColor: { value: new THREE.Color(0x5bf3ff) },   // Translucent SSS glow
+                uFoamColor: { value: new THREE.Color(0xf5fbff) },
+                uCausticsTex: { value: causticsTexture },
                 uCameraPos: { value: camera.position },
                 uIsUnderwater: { value: 0.0 }
             },
@@ -357,8 +372,35 @@
                 varying vec3 vWorldPos;
                 varying vec3 vNormal;
                 varying vec2 vUv;
-                varying float vFoam;
-                varying float vWavePeak;
+                varying float vWaveHeight;
+                varying float vNoiseMod;
+
+                // 2D Simplex / Perlin Noise to break uniform wave repetition
+                vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+                vec2 mod289(vec2 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+                vec3 permute(vec3 x) { return mod289(((x*34.0)+1.0)*x); }
+
+                float snoise(vec2 v) {
+                    const vec4 C = vec4(0.211324865405187, 0.366025403784439, -0.577350269189626, 0.024390243902439);
+                    vec2 i  = floor(v + dot(v, C.yy) );
+                    vec2 x0 = v -   i + dot(i, C.xx);
+                    vec2 i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+                    vec4 x12 = x0.xyxy + C.xxzz;
+                    x12.xy -= i1;
+                    i = mod289(i);
+                    vec3 p = permute( permute( i.y + vec3(0.0, i1.y, 1.0 )) + i.x + vec3(0.0, i1.x, 1.0 ));
+                    vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy), dot(x12.zw,x12.zw)), 0.0);
+                    m = m*m ; m = m*m ;
+                    vec3 x = 2.0 * fract(p * C.www) - 1.0;
+                    vec3 h = abs(x) - 0.5;
+                    vec3 ox = floor(x + 0.5);
+                    vec3 a0 = x - ox;
+                    m *= 1.79284291400159 - 0.85373472095314 * ( a0*a0 + h*h );
+                    vec3 g;
+                    g.x  = a0.x  * x0.x  + h.x  * x0.y;
+                    g.yz = a0.yz * x12.xz + h.yz * x12.yw;
+                    return 130.0 * dot(m, g);
+                }
 
                 struct Wave {
                     vec2 dir;
@@ -372,65 +414,57 @@
                     vUv = uv;
                     vec3 p = position;
 
-                    // 8-Octave Cascaded Wave Spectrum (Unity 6 / Phillips Model)
-                    Wave waves[8];
-                    waves[0] = Wave(vec2(1.0, 0.2),   0.28, 18.0, 0.85, 0.65);
-                    waves[1] = Wave(vec2(-0.7, 0.7),  0.18, 9.5,  1.10, 0.60);
-                    waves[2] = Wave(vec2(0.4, -0.9),  0.12, 5.2,  1.40, 0.55);
-                    waves[3] = Wave(vec2(-0.8, -0.6), 0.08, 3.0,  1.80, 0.50);
-                    waves[4] = Wave(vec2(0.9, 0.4),   0.05, 1.8,  2.20, 0.45);
-                    waves[5] = Wave(vec2(-0.3, 0.95), 0.03, 1.1,  2.70, 0.40);
-                    waves[6] = Wave(vec2(0.7, -0.7),  0.02, 0.65, 3.30, 0.35);
-                    waves[7] = Wave(vec2(-0.5, -0.85),0.012,0.38, 4.10, 0.30);
+                    // 6 Cascaded Wave Octaves
+                    Wave waves[6];
+                    waves[0] = Wave(vec2(1.0, 0.25),  0.22, 16.0, 0.9, 0.55);
+                    waves[1] = Wave(vec2(-0.7, 0.7),  0.15, 8.5,  1.1, 0.50);
+                    waves[2] = Wave(vec2(0.4, -0.9),  0.10, 4.8,  1.3, 0.45);
+                    waves[3] = Wave(vec2(-0.8, -0.6), 0.06, 2.6,  1.7, 0.40);
+                    waves[4] = Wave(vec2(0.9, 0.4),   0.04, 1.5,  2.1, 0.35);
+                    waves[5] = Wave(vec2(-0.3, 0.95), 0.02, 0.8,  2.6, 0.30);
 
                     vec3 displacement = vec3(0.0);
-                    float Jxx = 1.0;
-                    float Jzz = 1.0;
-                    float Jxz = 0.0;
 
-                    for (int i = 0; i < 8; i++) {
+                    for (int i = 0; i < 6; i++) {
                         float k = 6.2831853 / waves[i].wavelength;
                         float w = sqrt(9.81 * k) * waves[i].speed;
                         vec2 d = normalize(waves[i].dir);
                         float phase = k * dot(d, p.xz) - w * uTime;
                         float a = waves[i].amplitude;
-                        float q = waves[i].steepness / (k * a * 8.0);
+                        float q = waves[i].steepness / (k * a * 6.0);
 
-                        float cosPhase = cos(phase);
-                        float sinPhase = sin(phase);
-
-                        // Horizontal Pinch Displacement (makes crests sharp and peaks narrow)
-                        displacement.x += q * a * d.x * cosPhase;
-                        displacement.z += q * a * d.y * cosPhase;
-                        displacement.y += a * sinPhase;
-
-                        // Jacobian Derivatives for Whitecaps Foam Detection
-                        float WA = k * a;
-                        Jxx -= q * WA * d.x * d.x * sinPhase;
-                        Jzz -= q * WA * d.y * d.y * sinPhase;
-                        Jxz -= q * WA * d.x * d.y * sinPhase;
+                        displacement.x += q * a * d.x * cos(phase);
+                        displacement.z += q * a * d.y * cos(phase);
+                        displacement.y += a * sin(phase);
                     }
+
+                    // 3D Fractal Simplex Noise to break wave regularity and create organic turbulent water!
+                    vec2 noiseCoord1 = p.xz * 0.12 + vec2(uTime * 0.3, uTime * 0.25);
+                    vec2 noiseCoord2 = p.xz * 0.32 - vec2(uTime * 0.4, uTime * 0.15);
+                    float n1 = snoise(noiseCoord1) * 0.14;
+                    float n2 = snoise(noiseCoord2) * 0.06;
+                    float totalNoise = n1 + n2;
+
+                    displacement.y += totalNoise;
+                    vNoiseMod = totalNoise;
+                    vWaveHeight = displacement.y;
 
                     p += displacement;
 
-                    // Jacobian Determinant: J < 0.55 indicates wave is breaking / folding over into white foam!
-                    float jacobian = Jxx * Jzz - Jxz * Jxz;
-                    vFoam = clamp((0.68 - jacobian) * 3.2, 0.0, 1.0);
-                    vWavePeak = clamp(displacement.y * 1.5, 0.0, 1.0);
-
                     // Normal Calculation via finite differences
-                    float delta = 0.06;
+                    float delta = 0.08;
                     vec3 pX = p + vec3(delta, 0.0, 0.0);
                     vec3 pZ = p + vec3(0.0, 0.0, delta);
                     for (int i = 0; i < 4; i++) {
                         float k = 6.2831853 / waves[i].wavelength;
                         float w = sqrt(9.81 * k) * waves[i].speed;
                         vec2 d = normalize(waves[i].dir);
-                        float phaseX = k * dot(d, pX.xz) - w * uTime;
-                        float phaseZ = k * dot(d, pZ.xz) - w * uTime;
-                        pX.y += waves[i].amplitude * sin(phaseX);
-                        pZ.y += waves[i].amplitude * sin(phaseZ);
+                        pX.y += waves[i].amplitude * sin(k * dot(d, pX.xz) - w * uTime);
+                        pZ.y += waves[i].amplitude * sin(k * dot(d, pZ.xz) - w * uTime);
                     }
+                    pX.y += snoise(pX.xz * 0.12 + vec2(uTime * 0.3, uTime * 0.25)) * 0.14;
+                    pZ.y += snoise(pZ.xz * 0.12 + vec2(uTime * 0.3, uTime * 0.25)) * 0.14;
+
                     vNormal = normalize(cross(pZ - p, pX - p));
 
                     vWorldPos = (modelMatrix * vec4(p, 1.0)).xyz;
@@ -442,17 +476,18 @@
                 uniform vec3 uSunDir;
                 uniform vec3 uSunColor;
                 uniform vec3 uDeepColor;
+                uniform vec3 uShallowColor;
                 uniform vec3 uScatterColor;
                 uniform vec3 uFoamColor;
-                uniform sampler2D uFoamTex;
+                uniform sampler2D uCausticsTex;
                 uniform vec3 uCameraPos;
                 uniform float uIsUnderwater;
 
                 varying vec3 vWorldPos;
                 varying vec3 vNormal;
                 varying vec2 vUv;
-                varying float vFoam;
-                varying float vWavePeak;
+                varying float vWaveHeight;
+                varying float vNoiseMod;
 
                 void main() {
                     vec3 viewDir = normalize(uCameraPos - vWorldPos);
@@ -464,39 +499,42 @@
                     float NdotV = max(dot(N, viewDir), 0.0);
                     float fresnel = F0 + (1.0 - F0) * pow(1.0 - NdotV, 5.0);
 
-                    // 2. Subsurface Scattering (SSS): Waves glow translucent turquoise when backlit
-                    vec3 backLightDir = normalize(-uSunDir + N * 0.4);
-                    float SSS = pow(max(dot(viewDir, backLightDir), 0.0), 3.5) * vWavePeak;
-                    vec3 waterBody = mix(uDeepColor, uScatterColor, SSS * 0.8 + vWavePeak * 0.35);
+                    // 2. Crystal-Clear Aquatic Color Gradient (Evan Wallace Style)
+                    // High wave crests and shallow areas show radiant turquoise; troughs show deep azure
+                    float heightFactor = clamp(vWaveHeight * 1.8 + 0.3, 0.0, 1.0);
+                    vec3 waterColor = mix(uDeepColor, uShallowColor, heightFactor);
 
-                    // 3. Sun Specular Glitter (Blinn-Phong + anisotropic highlights)
+                    // 3. Subsurface Scattering (SSS): Waves glow with translucent cyan light
+                    vec3 backLight = normalize(-uSunDir + N * 0.35);
+                    float sss = pow(max(dot(viewDir, backLight), 0.0), 3.0) * max(0.0, vWaveHeight + 0.2);
+                    waterColor += uScatterColor * sss * 0.75;
+
+                    // 4. Dancing Caustics on the water volume
+                    vec2 cUv1 = vWorldPos.xz * 0.14 + vec2(uTime * 0.06, uTime * 0.04);
+                    vec2 cUv2 = vWorldPos.xz * 0.18 - vec2(uTime * 0.04, -uTime * 0.05);
+                    vec3 caustics = texture2D(uCausticsTex, cUv1).rgb * texture2D(uCausticsTex, cUv2).rgb * 2.2;
+                    waterColor += caustics * 0.35;
+
+                    // 5. Sun Specular Highlights & Glitter
                     vec3 H = normalize(uSunDir + viewDir);
-                    float specSharp = pow(max(dot(N, H), 0.0), 280.0) * 4.2;
-                    float specWide = pow(max(dot(N, H), 0.0), 40.0) * 0.8;
+                    float specSharp = pow(max(dot(N, H), 0.0), 240.0) * 4.0;
+                    float specWide = pow(max(dot(N, H), 0.0), 35.0) * 0.8;
                     vec3 sunSpecular = uSunColor * (specSharp + specWide);
 
-                    // 4. Sky Reflection
-                    vec3 skyRefl = mix(vec3(0.5, 0.65, 0.85), vec3(0.1, 0.28, 0.58), max(reflect(-viewDir, N).y, 0.0));
+                    // 6. Sky Reflection
+                    vec3 skyRefl = mix(vec3(0.6, 0.75, 0.95), vec3(0.18, 0.42, 0.75), max(reflect(-viewDir, N).y, 0.0));
 
-                    // Base ocean color combining SSS volume & Sky reflection
-                    vec3 finalCol = mix(waterBody, skyRefl, fresnel) + sunSpecular;
+                    vec3 finalCol = mix(waterColor, skyRefl, fresnel) + sunSpecular;
 
-                    // 5. Jacobian Whitecaps Foam (Matching Screenshot_41)
-                    // High-frequency animated foam noise
-                    vec2 foamUV1 = vWorldPos.xz * 0.25 + vec2(uTime * 0.05, uTime * 0.03);
-                    vec2 foamUV2 = vWorldPos.xz * 0.40 - vec2(uTime * 0.04, -uTime * 0.05);
-                    float foamPattern = texture2D(uFoamTex, foamUV1).r * 0.6 + texture2D(uFoamTex, foamUV2).r * 0.4;
-
-                    float whitecap = smoothstep(0.18, 0.65, vFoam * foamPattern);
-                    // Also foam on high crests
-                    if (vWorldPos.y > 0.35) {
-                        whitecap = max(whitecap, smoothstep(0.35, 0.52, vWorldPos.y) * foamPattern);
+                    // 7. Dynamic Wave Crest & Shore Foam (Organic Noise Driven)
+                    float foamThreshold = 0.36 + vNoiseMod * 0.5;
+                    if (vWaveHeight > foamThreshold) {
+                        float foamAmount = smoothstep(foamThreshold, foamThreshold + 0.16, vWaveHeight);
+                        finalCol = mix(finalCol, uFoamColor, foamAmount * 0.92);
                     }
 
-                    finalCol = mix(finalCol, uFoamColor, whitecap * 0.95);
-
-                    // Transmission Alpha: allows seeing submerged hull and seabed when looking down
-                    gl_FragColor = vec4(finalCol, mix(0.85, 0.98, whitecap));
+                    // Transmission Alpha: 0.75 makes the water crystal clear, revealing the seabed and boat hull!
+                    gl_FragColor = vec4(finalCol, 0.78);
                 }
             `,
             transparent: true,
@@ -563,7 +601,7 @@
                 void main() { vec4 mv = viewMatrix * vec4(position, 1.0); gl_PointSize = 18.0 * (15.0 / -mv.z); gl_Position = projectionMatrix * mv; }
             `,
             fragmentShader: `
-                void main() { float d = length(gl_PointCoord - vec2(0.5)); if (d > 0.5) discard; float ring = smoothstep(0.5, 0.4, d) * smoothstep(0.1, 0.35, d); gl_FragColor = vec4(0.6, 0.9, 1.0, ring * 0.75); }
+                void main() { float d = length(gl_PointCoord - vec2(0.5)); if (d > 0.5) discard; float ring = smoothstep(0.5, 0.4, d) * smoothstep(0.1, 0.35, d); gl_FragColor = vec4(0.6, 0.95, 1.0, ring * 0.85); }
             `,
             transparent: true, depthWrite: false
         });
@@ -731,9 +769,10 @@
 
         window.addEventListener('pointerup', () => { isSpraying = false; });
 
-        // 11. Main Loop & Underwater Handling
+        // 11. Main Loop & Underwater Refraction Distortion Handling
         const clock = new THREE.Clock();
-        const underwaterOverlay = document.getElementById('underwater-overlay');
+        const underwaterFilterLayer = document.getElementById('underwater-filter-layer');
+        const turbWave = document.getElementById('turb-wave');
         const statusText = document.getElementById('status-text');
         let wasUnderwater = false;
 
@@ -750,18 +789,26 @@
             if (isUnderwater !== wasUnderwater) {
                 wasUnderwater = isUnderwater;
                 if (isUnderwater) {
+                    // Luminous aquatic teal fog (NOT dark black!)
                     scene.fog.color.copy(underwaterFogColor);
-                    scene.fog.density = 0.055;
-                    underwaterOverlay.style.opacity = '1';
-                    statusText.innerText = "🌊 Sualtı (Underwater - Murky Fog & Bubbles)";
+                    scene.fog.density = 0.024; // Dreamy soft underwater fog
+                    underwaterFilterLayer.style.opacity = '1';
+                    statusText.innerText = "🌊 Sualtı (Underwater - Wavy Refraction Blur)";
                     statusText.parentElement.style.borderColor = '#0284c7';
                 } else {
                     scene.fog.color.copy(surfaceFogColor);
-                    scene.fog.density = 0.012;
-                    underwaterOverlay.style.opacity = '0';
-                    statusText.innerText = "Okyanus Yüzeyi (Surface)";
+                    scene.fog.density = 0.009;
+                    underwaterFilterLayer.style.opacity = '0';
+                    statusText.innerText = "Berrak Su Yüzeyi (Surface)";
                     statusText.parentElement.style.borderColor = 'rgba(56, 189, 248, 0.4)';
                 }
+            }
+
+            // Animate SVG underwater wave turbulence
+            if (isUnderwater && turbWave) {
+                const freqX = 0.015 + Math.sin(time * 1.5) * 0.005;
+                const freqY = 0.02 + Math.cos(time * 1.8) * 0.005;
+                turbWave.setAttribute('baseFrequency', `${freqX} ${freqY}`);
             }
 
             // Foam animation
@@ -793,7 +840,7 @@
                 d.life -= delta;
                 if (d.life <= 0) { scene.remove(d.mesh); debrisPool.splice(i, 1); continue; }
                 const inWater = (d.mesh.position.y < WATER_LEVEL);
-                if (inWater) { d.vel.y -= 3.5 * delta; d.vel.x *= 0.94; d.vel.z *= 0.94; }
+                if (inWater) { d.vel.y -= 3.0 * delta; d.vel.x *= 0.95; d.vel.z *= 0.95; }
                 else { d.vel.y -= 19.0 * delta; }
                 d.mesh.position.addScaledVector(d.vel, delta);
                 d.mesh.rotation.x += d.rot.x * delta;
