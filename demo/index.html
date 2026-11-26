@@ -2340,6 +2340,7 @@ struct VO { @builtin(position) pos: vec4f, @location(0) ndc: vec2f };
 
 
 
+
 const TEARDOWN_DDA_WGSL = FRAME_WGSL + /* wgsl */ `
 @group(0) @binding(1) var voxel3DTex: texture_3d<u32>;
 
@@ -2348,10 +2349,15 @@ struct BoxVertexOut {
   @location(0) worldPos: vec3f,
 };
 
+struct FSOut {
+  @location(0) color: vec4f,
+  @builtin(frag_depth) depth: f32,
+};
+
 // 36 vertices of the Bounding Box enclosing the voxel volume
 @vertex fn vs(@builtin(vertex_index) vi: u32) -> BoxVertexOut {
-  let boxMin = vec3f(-16.0, -1.0, -16.0);
-  let boxMax = vec3f( 16.0, 15.0,  16.0);
+  let boxMin = vec3f(-16.0, -1.0, 10.0);
+  let boxMax = vec3f( 16.0, 15.0, 42.0);
 
   let p = array<vec3f, 36>(
     // Front (+Z)
@@ -2383,7 +2389,7 @@ struct BoxVertexOut {
 }
 
 fn intersectAABB(ro: vec3f, rd: vec3f, bmin: vec3f, bmax: vec3f) -> vec2f {
-  let invD = 1.0 / (rd + vec3f(1e-7));
+  let invD = 1.0 / (rd + sign(rd) * 1e-7);
   let t0 = (bmin - ro) * invD;
   let t1 = (bmax - ro) * invD;
   let tmin = max(max(min(t0.x, t1.x), min(t0.y, t1.y)), min(t0.z, t1.z));
@@ -2391,9 +2397,9 @@ fn intersectAABB(ro: vec3f, rd: vec3f, bmin: vec3f, bmax: vec3f) -> vec2f {
   return vec2f(max(tmin, 0.0), tmax);
 }
 
-@fragment fn fs(in: BoxVertexOut) -> @location(0) vec4f {
-  let boxMin = vec3f(-16.0, -1.0, -16.0);
-  let boxMax = vec3f( 16.0, 15.0,  16.0);
+@fragment fn fs(in: BoxVertexOut) -> FSOut {
+  let boxMin = vec3f(-16.0, -1.0, 10.0);
+  let boxMax = vec3f( 16.0, 15.0, 42.0);
   let gridSize = vec3f(64.0, 32.0, 64.0);
 
   let ro = F.camPos.xyz;
@@ -2406,22 +2412,31 @@ fn intersectAABB(ro: vec3f, rd: vec3f, bmin: vec3f, bmax: vec3f) -> vec2f {
 
   // Transform ray to Grid Coordinates [0..64, 0..32, 0..64]
   let worldToGrid = gridSize / (boxMax - boxMin);
-  let startP = ro + rd * (hitBox.x + 0.001);
-  let gridRayOrigin = (startP - boxMin) * worldToGrid;
+  let startWorldP = ro + rd * (hitBox.x + 0.002);
+  let gridRayOrigin = (startWorldP - boxMin) * worldToGrid;
   let gridRayDir = rd * worldToGrid;
 
-  // 3D DDA Setup (Fast Voxel Traversal)
+  // Amanatides & Woo 3D DDA
   var mapPos = vec3i(floor(gridRayOrigin));
+  mapPos = clamp(mapPos, vec3i(0), vec3i(gridSize) - vec3i(1));
+
   let stepDir = vec3i(sign(gridRayDir));
-  let deltaDist = abs(vec3f(length(gridRayDir)) / (gridRayDir + vec3f(1e-9)));
-  var sideDist = (vec3f(stepDir) * (vec3f(mapPos) - gridRayOrigin) + (vec3f(stepDir) * 0.5) + 0.5) * deltaDist;
+  let deltaDist = abs(1.0 / (gridRayDir + sign(gridRayDir) * 1e-7));
+
+  var sideDist = vec3f(0.0);
+  if (stepDir.x > 0) { sideDist.x = (f32(mapPos.x + 1) - gridRayOrigin.x) * deltaDist.x; }
+  else { sideDist.x = (gridRayOrigin.x - f32(mapPos.x)) * deltaDist.x; }
+  if (stepDir.y > 0) { sideDist.y = (f32(mapPos.y + 1) - gridRayOrigin.y) * deltaDist.y; }
+  else { sideDist.y = (gridRayOrigin.y - f32(mapPos.y)) * deltaDist.y; }
+  if (stepDir.z > 0) { sideDist.z = (f32(mapPos.z + 1) - gridRayOrigin.z) * deltaDist.z; }
+  else { sideDist.z = (gridRayOrigin.z - f32(mapPos.z)) * deltaDist.z; }
 
   var hitVoxel = 0u;
   var hitNormal = vec3f(0.0);
   var mask = vec3i(0);
+  var tHit = 0.0;
 
-  // Traverse up to 128 DDA steps
-  for (var i = 0; i < 128; i++) {
+  for (var i = 0; i < 160; i++) {
     if (any(mapPos < vec3i(0)) || any(mapPos >= vec3i(gridSize))) {
       break;
     }
@@ -2435,20 +2450,24 @@ fn intersectAABB(ro: vec3f, rd: vec3f, bmin: vec3f, bmax: vec3f) -> vec2f {
 
     if (sideDist.x < sideDist.y) {
       if (sideDist.x < sideDist.z) {
+        tHit = sideDist.x;
         sideDist.x += deltaDist.x;
         mapPos.x += stepDir.x;
         mask = vec3i(1, 0, 0);
       } else {
+        tHit = sideDist.z;
         sideDist.z += deltaDist.z;
         mapPos.z += stepDir.z;
         mask = vec3i(0, 0, 1);
       }
     } else {
       if (sideDist.y < sideDist.z) {
+        tHit = sideDist.y;
         sideDist.y += deltaDist.y;
         mapPos.y += stepDir.y;
         mask = vec3i(0, 1, 0);
       } else {
+        tHit = sideDist.z;
         sideDist.z += deltaDist.z;
         mapPos.z += stepDir.z;
         mask = vec3i(0, 0, 1);
@@ -2462,26 +2481,33 @@ fn intersectAABB(ro: vec3f, rd: vec3f, bmin: vec3f, bmax: vec3f) -> vec2f {
 
   // Teardown PBR palette
   var albedo = vec3f(0.5, 0.5, 0.5);
-  var roughness = 0.8;
-  if (hitVoxel == 1u) { albedo = vec3f(0.48, 0.49, 0.52); roughness = 0.9; }      // Stone
-  else if (hitVoxel == 2u) { albedo = vec3f(0.55, 0.35, 0.20); roughness = 0.7; } // Wood
-  else if (hitVoxel == 3u) { albedo = vec3f(0.68, 0.32, 0.22); roughness = 0.85; } // Brick
-  else if (hitVoxel == 4u) { albedo = vec3f(0.72, 0.18, 0.14); roughness = 0.6; } // Red Roof Tile
-  else if (hitVoxel == 5u) { albedo = vec3f(0.18, 0.52, 0.16); roughness = 0.95; } // Foliage
-  else if (hitVoxel == 6u) { albedo = vec3f(0.85, 0.95, 0.98); roughness = 0.1; } // Glass / Lantern
-  else if (hitVoxel == 7u) { albedo = vec3f(0.78, 0.79, 0.82); roughness = 0.3; } // Metal
+  if (hitVoxel == 1u) { albedo = vec3f(0.52, 0.54, 0.58); }       // Stone breakwater / pier
+  else if (hitVoxel == 2u) { albedo = vec3f(0.62, 0.40, 0.22); }  // Wood dock / framing
+  else if (hitVoxel == 3u) { albedo = vec3f(0.72, 0.30, 0.22); }  // Cottage Brick
+  else if (hitVoxel == 4u) { albedo = vec3f(0.85, 0.20, 0.15); }  // Red Roof Tiles
+  else if (hitVoxel == 5u) { albedo = vec3f(0.18, 0.58, 0.16); }  // Foliage
+  else if (hitVoxel == 6u) { albedo = vec3f(0.90, 0.98, 1.00); }  // Glass lantern
+  else if (hitVoxel == 7u) { albedo = vec3f(0.82, 0.85, 0.88); }  // Metal pilings / lantern
 
   let N = normalize(hitNormal);
   let L = normalize(F.sunDir.xyz);
   let NdL = max(dot(N, L), 0.0);
 
-  // Teardown Soft Ambient + Sun Diffuse + Sky bounce
+  // Teardown Ambient & Sun Diffuse
   let skyUp = vec3f(0.4, 0.65, 0.95);
-  let groundBounce = vec3f(0.15, 0.12, 0.08);
-  let ambient = mix(groundBounce, skyUp, N.y * 0.5 + 0.5) * 0.45;
-  let direct = albedo * (NdL * 1.6 * max(F.sunDir.y, 0.05) + ambient);
+  let ambient = mix(vec3f(0.15, 0.12, 0.08), skyUp, N.y * 0.5 + 0.5) * 0.55;
+  let direct = albedo * (NdL * 2.2 * max(F.sunDir.y, 0.08) + ambient);
 
-  return vec4f(direct, 1.0);
+  // Compute exact reverse-Z depth for correct occluding against water
+  let hitGridPos = gridRayOrigin + gridRayDir * tHit;
+  let hitWorldPos = boxMin + hitGridPos / worldToGrid;
+  let clipPos = F.viewProj * vec4f(hitWorldPos - ro, 1.0);
+  let fragZ = clipPos.z / clipPos.w;
+
+  var output: FSOut;
+  output.color = vec4f(direct, 1.0);
+  output.depth = fragZ;
+  return output;
 }
 `;
 
@@ -3922,7 +3948,7 @@ async function main() {
         entryPoint: 'fs',
         targets: [{ format: HDR }],
       },
-      primitive: { topology: 'triangle-list', cullMode: 'back' },
+      primitive: { topology: 'triangle-list', cullMode: 'none' },
       depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'greater' },
       multisample: { count: MSAA },
     });
@@ -4222,7 +4248,7 @@ async function main() {
 
   // --------------------------------------------------------------------------------------
 
-  const cam = { x: 0, y: 2.4, z: 0, yaw: 0, pitch: -5.5 * D2R, fovY: 58 * D2R, speed: 6 };
+  const cam = { x: 0, y: 14.0, z: -14.0, yaw: 0, pitch: -14.0 * D2R, fovY: 58 * D2R, speed: 10 };
 
   if (qs.get('cam')) {
 
@@ -4922,6 +4948,14 @@ async function main() {
 
     const rp = enc.beginRenderPass(mainPass);
 
+    // Render Teardown Voxels FIRST (Opaque geometry)
+    if (teardownPipe && teardownTex) {
+      rp.setPipeline(teardownPipe);
+      rp.setBindGroup(0, bgTeardown);
+      rp.draw(36); // Exactly 36 vertices / 12 triangles for the bounding box
+    }
+
+    // Render Ocean Water Surface
     if (nodeCount) {
 
       rp.setPipeline(oceanPipe);
@@ -4934,12 +4968,6 @@ async function main() {
 
       rp.drawIndexed(GRID * GRID * 6, nodeCount);
 
-    }
-
-    if (teardownPipe && teardownTex) {
-      rp.setPipeline(teardownPipe);
-      rp.setBindGroup(0, bgTeardown);
-      rp.draw(36); // Exactly 36 vertices / 12 triangles for the bounding box
     }
 
     rp.setPipeline(skyPipe);
