@@ -87,3 +87,9 @@ if (tMaxX < tMaxY && tMaxX < tMaxZ) {
 - `examples/shaders/voxel_dda.glsl`: OpenGL / Vulkan GLSL DDA shader.
 - `examples/roblox/VoxelDestruction.luau`: Real-time voxel damage & fragment spawner for Roblox.
 - `examples/roblox/RealisticVFXSetup.luau`: Cinematic fire, smoke, and water particle instantiator for Roblox.
+
+## Lightweight Gerstner & Teardown Voxel Hybrid (2026 Optimization)
+- **Extreme Distance Culling:** LOD tree clamped to 8 levels (distant water beyond ~500m culled/faded into fog).
+- **Submerged Platform Foundation:** Solid voxel platform extends through water down to seabed Y=0 so water never penetrates the player area.
+- **Wave Masking:** Procedural attenuation mask dampens waves around structures (platMask = smoothstep(0.0, 2.5, pDist)).
+- **WebGPU RGBA8 Alignment:** 64x32x64 volume textures aligned to 256 bytes per row (ytesPerRow = 256).

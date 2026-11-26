@@ -66,7 +66,7 @@
 
   <div id="fps">starting…</div>
 
-  <div class="help"><strong>Sol Tik:</strong> Teardown DDA Volume Raymarcher (Acko.net) + Dinamik Yikim | <strong>WASD / Sag Tik:</strong> Uc & Dal | <strong>H:</strong> Ayarlar | GPU Optimizasyonu Aktif</div>
+  <div class="help"><strong>Sol Tik:</strong> Platform Zemin + Gerstner PBR Durgun Su + Uzak Culling | <strong>WASD / Sag Tik:</strong> Uc & Dal | <strong>H:</strong> Ayarlar | GPU Optimizasyonu Aktif</div>
 
 </div>
 
@@ -2570,12 +2570,20 @@ struct VSOut {
 
   }
 
-  var o: VSOut;
+  // Calm the waves by 40% for serene waters and suppress water under platform
+  let pDistX = max(0.0, abs(xz.x) - 10.0);
+  let pDistZ = max(0.0, abs(xz.y - 26.0) - 9.0);
+  let pDist = sqrt(pDistX * pDistX + pDistZ * pDistZ);
+  let platMask = smoothstep(0.0, 2.5, pDist);
 
-  let world = vec3f(xz.x + disp.x, disp.y, xz.y + disp.z);
+  var o: VSOut;
+  // Damp wave amplitude and suppress water height near platform to prevent clipping
+  let calmDisp = disp * 0.55 * platMask;
+  // Push water level down under platform
+  let waterY = mix(-1.0, calmDisp.y, platMask);
+  let world = vec3f(xz.x + calmDisp.x, waterY, xz.y + calmDisp.z);
 
   o.rel = world - F.camPos.xyz;
-
   o.pos = F.viewProj * vec4f(o.rel, 1.0);
 
   o.xz = xz;
@@ -2956,14 +2964,14 @@ fn foamPattern(xz: vec2f, t: f32) -> f32 {
 
   // aerial perspective: atmosphere extinction plus a marine haze floor
 
+  // Distance Culling Fog: Smoothly blend distant water beyond 450m into atmosphere
+  let distFade = 1.0 - smoothstep(300.0, 550.0, dist);
   let T = exp(-max(F.fogExt.rgb, vec3f(F.fogExt.w)) * dist);
-
   let hz = normalize(vec3f(-V.x, 0.002, -V.z));
-
   let fogCol = skyAtmo(hz);
-
   col = col * T + fogCol * (1.0 - T);
-
+  // Blend to sky at max range
+  col = mix(fogCol, col, distFade);
   return vec4f(col, 1.0);
 
 }
@@ -3963,7 +3971,7 @@ async function main() {
 
   const R0 = 8 * LEAF;        // LOD 0 range
 
-  const LODS = 17;
+  const LODS = 8;
 
   const MAX_DIST = 160000;
 
@@ -4227,7 +4235,7 @@ async function main() {
 
   // --------------------------------------------------------------------------------------
 
-  const cam = { x: 0, y: 14.0, z: -14.0, yaw: 0, pitch: -14.0 * D2R, fovY: 58 * D2R, speed: 10 };
+  const cam = { x: 0.0, y: 4.8, z: 18.0, yaw: 0, pitch: -6.0 * D2R, fovY: 62 * D2R, speed: 8 };
 
   if (qs.get('cam')) {
 
