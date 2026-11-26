@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voxel Realism Engine - Interactive Demo</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { overflow: hidden; background: #050811; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        #canvas-container { width: 100vw; height: 100vh; display: block; }
+        #hud {
+            position: absolute; top: 16px; left: 16px;
+            background: rgba(10, 15, 25, 0.85); backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 10px;
+            padding: 16px 20px; color: #f0f4fc; max-width: 340px; pointer-events: none;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        #hud h1 { font-size: 1.1rem; font-weight: 700; color: #60a5fa; margin-bottom: 6px; letter-spacing: 0.5px; }
+        #hud p { font-size: 0.82rem; color: #94a3b8; line-height: 1.4; margin-bottom: 8px; }
+        .badge { display: inline-block; padding: 2px 8px; background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 4px; font-size: 0.72rem; color: #93c5fd; margin-right: 4px; margin-bottom: 4px; }
+        .controls-hint { font-size: 0.78rem; color: #cbd5e1; border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 8px; margin-top: 6px; }
+        .controls-hint span { color: #f59e0b; font-weight: 600; }
+        #crosshair {
+            position: absolute; top: 50%; left: 50%; width: 8px; height: 8px;
+            transform: translate(-50%, -50%); border-radius: 50%;
+            background: rgba(255, 255, 255, 0.7); pointer-events: none;
+            box-shadow: 0 0 8px rgba(255,255,255,0.8);
+        }
+    </style>
+    <!-- Import map for Three.js and Addons -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+</head>
+<body>
+    <div id="hud">
+        <h1>Voxel Realism Engine</h1>
+        <p>Voxel world with physical Gerstner water, dynamic foam, multi-tier volumetric fire & smoke, and real-time debris destruction.</p>
+        <div>
+            <span class="badge">Gerstner Waves</span>
+            <span class="badge">Beer-Lambert Water</span>
+            <span class="badge">Blackbody Fire</span>
+            <span class="badge">Voxel Debris</span>
+        </div>
+        <div class="controls-hint">
+            <div><span>Sol Tık:</span> Voxel Patlat / Yık</div>
+            <div><span>Sağ Tık:</span> Kamera Döndür</div>
+            <div><span>Shift + Tık:</span> Ateş & Duman Ocağı Yerleştir</div>
+            <div><span>Tekerlek:</span> Yakınlaş / Uzaklaş</div>
+        </div>
+    </div>
+    <div id="crosshair"></div>
+    <div id="canvas-container"></div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
+
+        // 1. Scene Setup
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0a1122);
+        scene.fog = new THREE.FogExp2(0x0a1122, 0.012);
+
+        const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(35, 28, 42);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.15;
+        container.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.maxPolarAngle = Math.PI / 2 - 0.02; // Don't go below ground
+        controls.target.set(0, 4, 0);
+
+        // 2. Lighting
+        const ambientLight = new THREE.AmbientLight(0x2a3b5c, 1.2);
+        scene.add(ambientLight);
+
+        const sunLight = new THREE.DirectionalLight(0xfffaed, 2.8);
+        sunLight.position.set(40, 50, 30);
+        sunLight.castShadow = true;
+        sunLight.shadow.mapSize.width = 2048;
+        sunLight.shadow.mapSize.height = 2048;
+        sunLight.shadow.camera.near = 0.5;
+        sunLight.shadow.camera.far = 150;
+        const d = 35;
+        sunLight.shadow.camera.left = -d;
+        sunLight.shadow.camera.right = d;
+        sunLight.shadow.camera.top = d;
+        sunLight.shadow.camera.bottom = -d;
+        sunLight.shadow.bias = -0.0005;
+        scene.add(sunLight);
+
+        // 3. Voxel Grid Architecture (InstancedMesh)
+        const GRID_X = 42;
+        const GRID_Y = 22;
+        const GRID_Z = 42;
+        const VOXEL_SIZE = 1.0;
+        const MAX_VOXELS = GRID_X * GRID_Y * GRID_Z;
+
+        // Voxel Types: 0: Air, 1: Sand, 2: Grass, 3: Rock, 4: Stone Brick
+        const grid = new Uint8Array(MAX_VOXELS);
+        const indexMap = new Int32Array(MAX_VOXELS).fill(-1);
+
+        function gridIndex(x, y, z) {
+            return x + y * GRID_X + z * GRID_X * GRID_Y;
+        }
+
+        const voxelGeometry = new THREE.BoxGeometry(VOXEL_SIZE, VOXEL_SIZE, VOXEL_SIZE);
+        const voxelMaterial = new THREE.MeshStandardMaterial({
+            roughness: 0.85,
+            metalness: 0.05,
+            flatShading: true
+        });
+
+        const instancedMesh = new THREE.InstancedMesh(voxelGeometry, voxelMaterial, MAX_VOXELS);
+        instancedMesh.castShadow = true;
+        instancedMesh.receiveShadow = true;
+        scene.add(instancedMesh);
+
+        // Procedural Island Generation
+        const dummy = new THREE.Object3D();
+        const color = new THREE.Color();
+        let activeInstanceCount = 0;
+        const instanceToVoxel = [];
+
+        const colors = {
+            sand: new THREE.Color(0xd4b886),
+            grass: new THREE.Color(0x3e7a33),
+            rock: new THREE.Color(0x61666d),
+            brick: new THREE.Color(0x8a4538)
+        };
+
+        for (let x = 0; x < GRID_X; x++) {
+            for (let z = 0; z < GRID_Z; z++) {
+                const cx = x - GRID_X / 2;
+                const cz = z - GRID_Z / 2;
+                const distFromCenter = Math.sqrt(cx * cx + cz * cz);
+                const maxRadius = GRID_X * 0.44;
+
+                // Procedural terrain height with noise simulation
+                const n1 = Math.sin(x * 0.2) * Math.cos(z * 0.2);
+                const n2 = Math.sin(x * 0.4 + 1.2) * Math.sin(z * 0.4 + 0.8) * 0.5;
+                const islandFalloff = Math.max(0, 1 - Math.pow(distFromCenter / maxRadius, 2));
+                const height = Math.floor((n1 + n2 + 1.6) * 4.5 * islandFalloff);
+
+                for (let y = 0; y <= height; y++) {
+                    if (y === 0 && distFromCenter > maxRadius + 3) continue;
+                    let type = 2; // Grass
+                    if (y <= 3) type = 1; // Sand
+                    else if (y < height - 1) type = 3; // Rock
+                    else if (Math.random() < 0.04) type = 4; // Ancient Brick
+
+                    const idx = gridIndex(x, y, z);
+                    grid[idx] = type;
+
+                    dummy.position.set(
+                        (x - GRID_X / 2) * VOXEL_SIZE,
+                        y * VOXEL_SIZE,
+                        (z - GRID_Z / 2) * VOXEL_SIZE
+                    );
+                    dummy.updateMatrix();
+
+                    const instId = activeInstanceCount++;
+                    indexMap[idx] = instId;
+                    instanceToVoxel[instId] = { x, y, z };
+
+                    instancedMesh.setMatrixAt(instId, dummy.matrix);
+
+                    if (type === 1) color.copy(colors.sand);
+                    else if (type === 2) color.copy(colors.grass);
+                    else if (type === 3) color.copy(colors.rock);
+                    else color.copy(colors.brick);
+
+                    // Ambient occlusion / height shade
+                    color.multiplyScalar(0.75 + (y / GRID_Y) * 0.35);
+                    instancedMesh.setColorAt(instId, color);
+                }
+            }
+        }
+        instancedMesh.count = activeInstanceCount;
+        instancedMesh.instanceMatrix.needsUpdate = true;
+        if (instancedMesh.instanceColor) instancedMesh.instanceColor.needsUpdate = true;
+
+        // 4. Realistic Gerstner Water Shader
+        const WATER_LEVEL = 3.2;
+        const waterGeometry = new THREE.PlaneGeometry(120, 120, 128, 128);
+        waterGeometry.rotateX(-Math.PI / 2);
+
+        const waterMaterial = new THREE.ShaderMaterial({
+            uniforms: {
+                uTime: { value: 0 },
+                uSunDir: { value: sunLight.position.clone().normalize() },
+                uSunColor: { value: new THREE.Color(0xfff5e6) },
+                uWaterColor: { value: new THREE.Color(0x0a3b5c) },
+                uShallowColor: { value: new THREE.Color(0x188a9e) },
+                uFoamColor: { value: new THREE.Color(0xf0f8ff) },
+                uWaterLevel: { value: WATER_LEVEL }
+            },
+            vertexShader: `
+                uniform float uTime;
+                varying vec3 vWorldPos;
+                varying vec3 vNormal;
+                varying vec2 vUv;
+
+                vec3 gerstnerWave(vec2 pos, vec2 dir, float steepness, float wavelength, float speed) {
+                    float k = 6.2831853 / wavelength;
+                    float c = sqrt(9.81 / k);
+                    vec2 d = normalize(dir);
+                    float f = k * (dot(d, pos) - c * speed * uTime);
+                    float a = steepness / k;
+                    return vec3(d.x * (a * cos(f)), a * sin(f), d.y * (a * cos(f)));
+                }
+
+                void main() {
+                    vUv = uv;
+                    vec3 pos = position;
+
+                    // 4 Layered Gerstner Waves
+                    vec3 w1 = gerstnerWave(pos.xz, vec2(1.0, 0.2), 0.18, 16.0, 0.9);
+                    vec3 w2 = gerstnerWave(pos.xz, vec2(-0.7, 0.7), 0.12, 8.0, 1.1);
+                    vec3 w3 = gerstnerWave(pos.xz, vec2(0.3, -0.9), 0.08, 4.0, 1.4);
+                    vec3 w4 = gerstnerWave(pos.xz, vec2(0.5, 0.5), 0.05, 2.0, 1.8);
+
+                    pos += w1 + w2 + w3 + w4;
+
+                    // Finite difference normal approximation
+                    float delta = 0.1;
+                    vec3 pX = pos + gerstnerWave(pos.xz + vec2(delta, 0.0), vec2(1.0, 0.2), 0.18, 16.0, 0.9) - w1;
+                    vec3 pZ = pos + gerstnerWave(pos.xz + vec2(0.0, delta), vec2(1.0, 0.2), 0.18, 16.0, 0.9) - w1;
+                    vNormal = normalize(cross(pZ - pos, pX - pos));
+
+                    vWorldPos = (modelMatrix * vec4(pos, 1.0)).xyz;
+                    gl_Position = projectionMatrix * viewMatrix * vec4(vWorldPos, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform vec3 uSunDir;
+                uniform vec3 uSunColor;
+                uniform vec3 uWaterColor;
+                uniform vec3 uShallowColor;
+                uniform vec3 uFoamColor;
+                uniform float uTime;
+                varying vec3 vWorldPos;
+                varying vec3 vNormal;
+                varying vec2 vUv;
+
+                void main() {
+                    vec3 viewDir = normalize(cameraPosition - vWorldPos);
+                    vec3 N = normalize(vNormal);
+
+                    // Fresnel (Schlick)
+                    float F0 = 0.02;
+                    float fresnel = F0 + (1.0 - F0) * pow(1.0 - max(dot(N, viewDir), 0.0), 5.0);
+
+                    // Deep water vs shallow gradient
+                    vec3 waterBase = mix(uWaterColor, uShallowColor, 0.35 + 0.25 * sin(vWorldPos.y * 3.0 + uTime));
+
+                    // Sun Specular (Blinn-Phong)
+                    vec3 H = normalize(uSunDir + viewDir);
+                    float spec = pow(max(dot(N, H), 0.0), 180.0) * 3.2;
+                    vec3 specular = uSunColor * spec;
+
+                    // Sky Reflection
+                    vec3 skyRefl = mix(vec3(0.5, 0.65, 0.85), vec3(0.1, 0.3, 0.6), max(reflect(-viewDir, N).y, 0.0));
+                    vec3 col = mix(waterBase, skyRefl, fresnel) + specular;
+
+                    // Wave Crest Foam
+                    if (vWorldPos.y > 3.45) {
+                        float foam = smoothstep(3.45, 3.65, vWorldPos.y);
+                        col = mix(col, uFoamColor, foam * 0.85);
+                    }
+
+                    gl_FragColor = vec4(col, 0.88);
+                }
+            `,
+            transparent: true,
+            depthWrite: false
+        });
+
+        const waterMesh = new THREE.Mesh(waterGeometry, waterMaterial);
+        waterMesh.position.y = WATER_LEVEL;
+        scene.add(waterMesh);
+
+        // 5. Physical Voxel Debris System
+        const debrisList = [];
+        const debrisGeo = new THREE.BoxGeometry(0.35, 0.35, 0.35);
+        const debrisMat = new THREE.MeshStandardMaterial({ roughness: 0.8, metalness: 0.1 });
+
+        function spawnDebris(x, y, z, originalType) {
+            const count = 6;
+            for (let i = 0; i < count; i++) {
+                const mesh = new THREE.Mesh(debrisGeo, debrisMat.clone());
+                mesh.position.set(
+                    x + (Math.random() - 0.5) * 0.8,
+                    y + (Math.random() - 0.5) * 0.8,
+                    z + (Math.random() - 0.5) * 0.8
+                );
+                let col = colors.grass;
+                if (originalType === 1) col = colors.sand;
+                else if (originalType === 3) col = colors.rock;
+                else if (originalType === 4) col = colors.brick;
+                mesh.material.color.copy(col);
+
+                mesh.castShadow = true;
+                scene.add(mesh);
+
+                debrisList.push({
+                    mesh,
+                    velocity: new THREE.Vector3(
+                        (Math.random() - 0.5) * 8.0,
+                        Math.random() * 6.0 + 3.0,
+                        (Math.random() - 0.5) * 8.0
+                    ),
+                    rotSpeed: new THREE.Vector3(
+                        (Math.random() - 0.5) * 10,
+                        (Math.random() - 0.5) * 10,
+                        (Math.random() - 0.5) * 10
+                    ),
+                    life: 4.5
+                });
+            }
+        }
+
+        // 6. Realistic Multi-tier Fire & Smoke Systems
+        const fireSites = [];
+
+        function createCombustionSite(pos) {
+            // Particle group: Flames, Smoke, Sparks
+            const count = 180;
+            const geo = new THREE.BufferGeometry();
+            const positions = new Float32Array(count * 3);
+            const scales = new Float32Array(count);
+            const particleData = [];
+
+            for (let i = 0; i < count; i++) {
+                positions[i * 3 + 0] = pos.x;
+                positions[i * 3 + 1] = pos.y;
+                positions[i * 3 + 2] = pos.z;
+                scales[i] = 1.0;
+
+                const isSmoke = i > 70;
+                particleData.push({
+                    basePos: pos.clone(),
+                    pos: new THREE.Vector3(pos.x, pos.y, pos.z),
+                    vel: new THREE.Vector3(
+                        (Math.random() - 0.5) * (isSmoke ? 0.9 : 0.4),
+                        Math.random() * (isSmoke ? 2.5 : 4.0) + 1.0,
+                        (Math.random() - 0.5) * (isSmoke ? 0.9 : 0.4)
+                    ),
+                    age: Math.random() * 2.0,
+                    maxAge: isSmoke ? (2.5 + Math.random() * 1.5) : (0.6 + Math.random() * 0.5),
+                    isSmoke,
+                    size: isSmoke ? 1.4 : 0.6
+                });
+            }
+
+            geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+            // Custom Shader Material for realistic Blackbody fire & absorbing smoke
+            const mat = new THREE.ShaderMaterial({
+                uniforms: {
+                    uTime: { value: 0 }
+                },
+                vertexShader: `
+                    attribute float aAgeNorm;
+                    varying float vAgeNorm;
+                    varying float vIsSmoke;
+                    attribute float aIsSmoke;
+
+                    void main() {
+                        vAgeNorm = aAgeNorm;
+                        vIsSmoke = aIsSmoke;
+                        vec4 mvPos = viewMatrix * vec4(position, 1.0);
+                        gl_PointSize = (vIsSmoke > 0.5 ? 42.0 : 28.0) * (30.0 / -mvPos.z);
+                        gl_Position = projectionMatrix * mvPos;
+                    }
+                `,
+                fragmentShader: `
+                    varying float vAgeNorm;
+                    varying float vIsSmoke;
+
+                    void main() {
+                        float dist = length(gl_PointCoord - vec2(0.5));
+                        if (dist > 0.5) discard;
+                        float soft = smoothstep(0.5, 0.05, dist);
+
+                        if (vIsSmoke > 0.5) {
+                            // Dark volumetric smoke
+                            float smokeFade = (1.0 - vAgeNorm) * 0.35 * soft;
+                            gl_FragColor = vec4(vec3(0.12, 0.12, 0.14), smokeFade);
+                        } else {
+                            // Blackbody radiation curve (White-Yellow -> Bright Orange -> Deep Red)
+                            vec3 col = mix(vec3(1.0, 0.95, 0.6), vec3(1.0, 0.4, 0.05), vAgeNorm * 1.4);
+                            col = mix(col, vec3(0.6, 0.08, 0.02), smoothstep(0.4, 1.0, vAgeNorm));
+                            float flameAlpha = (1.0 - vAgeNorm) * soft * 0.95;
+                            gl_FragColor = vec4(col * 2.2, flameAlpha);
+                        }
+                    }
+                `,
+                transparent: true,
+                depthWrite: false,
+                blending: THREE.NormalBlending
+            });
+
+            const pSystem = new THREE.Points(geo, mat);
+            scene.add(pSystem);
+
+            // Light from fire
+            const fireLight = new THREE.PointLight(0xff7722, 4.0, 15);
+            fireLight.position.copy(pos).add(new THREE.Vector3(0, 1.2, 0));
+            scene.add(fireLight);
+
+            fireSites.push({ pSystem, particleData, count, fireLight, geo });
+        }
+
+        // Spawn default campfire on the island
+        createCombustionSite(new THREE.Vector3(0, 9.5, 0));
+
+        // 7. Raycasting & Interaction
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        window.addEventListener('pointerdown', (e) => {
+            if (e.button !== 0) return; // Only Left Click
+            mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObject(instancedMesh);
+
+            if (intersects.length > 0) {
+                const hit = intersects[0];
+                const instId = hit.instanceId;
+                const v = instanceToVoxel[instId];
+                if (!v) return;
+
+                if (e.shiftKey) {
+                    // Place fire/smoke site
+                    createCombustionSite(hit.point);
+                    return;
+                }
+
+                // Voxel Explosion (Carving)
+                const radius = 2;
+                for (let dx = -radius; dx <= radius; dx++) {
+                    for (let dy = -radius; dy <= radius; dy++) {
+                        for (let dz = -radius; dz <= radius; dz++) {
+                            if (dx*dx + dy*dy + dz*dz <= radius*radius + 0.5) {
+                                const nx = v.x + dx;
+                                const ny = v.y + dy;
+                                const nz = v.z + dz;
+                                if (nx >= 0 && nx < GRID_X && ny >= 0 && ny < GRID_Y && nz >= 0 && nz < GRID_Z) {
+                                    const gIdx = gridIndex(nx, ny, nz);
+                                    const t = grid[gIdx];
+                                    if (t > 0) {
+                                        grid[gIdx] = 0;
+                                        const iId = indexMap[gIdx];
+                                        if (iId !== -1) {
+                                            // Hide instance by scaling to zero
+                                            dummy.position.set(0, -9999, 0);
+                                            dummy.scale.set(0, 0, 0);
+                                            dummy.updateMatrix();
+                                            instancedMesh.setMatrixAt(iId, dummy.matrix);
+                                            indexMap[gIdx] = -1;
+
+                                            spawnDebris(
+                                                (nx - GRID_X / 2) * VOXEL_SIZE,
+                                                ny * VOXEL_SIZE,
+                                                (nz - GRID_Z / 2) * VOXEL_SIZE,
+                                                t
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                instancedMesh.instanceMatrix.needsUpdate = true;
+            }
+        });
+
+        // 8. lil-gui Config
+        const gui = new GUI({ title: "Engine Parameters" });
+        const params = {
+            waterSpeed: 1.0,
+            waterLevel: WATER_LEVEL,
+            sunIntensity: 2.8,
+            resetIsland: () => window.location.reload()
+        };
+
+        gui.add(params, 'waterSpeed', 0.1, 3.0, 0.1).name("Dalga Hızı");
+        gui.add(params, 'waterLevel', 0.0, 8.0, 0.1).name("Su Seviyesi").onChange(v => {
+            waterMesh.position.y = v;
+            waterMaterial.uniforms.uWaterLevel.value = v;
+        });
+        gui.add(params, 'sunIntensity', 0.5, 6.0, 0.1).name("Güneş Işığı").onChange(v => {
+            sunLight.intensity = v;
+        });
+        gui.add(params, 'resetIsland').name("Adâyı Sıfırla");
+
+        // 9. Main Animation Loop
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+            const time = clock.getElapsedTime();
+
+            // Update Water
+            waterMaterial.uniforms.uTime.value = time * params.waterSpeed;
+
+            // Update Physical Voxel Debris
+            for (let i = debrisList.length - 1; i >= 0; i--) {
+                const d = debrisList[i];
+                d.life -= delta;
+                if (d.life <= 0) {
+                    scene.remove(d.mesh);
+                    debrisList.splice(i, 1);
+                    continue;
+                }
+
+                // Gravity & Drag
+                d.velocity.y -= 18.0 * delta;
+                d.mesh.position.addScaledVector(d.velocity, delta);
+                d.mesh.rotation.x += d.rotSpeed.x * delta;
+                d.mesh.rotation.y += d.rotSpeed.y * delta;
+
+                // Bounce off water or ground
+                if (d.mesh.position.y < waterMesh.position.y) {
+                    d.mesh.position.y = waterMesh.position.y;
+                    d.velocity.y *= -0.3;
+                    d.velocity.x *= 0.7;
+                    d.velocity.z *= 0.7;
+                }
+            }
+
+            // Update Fire & Smoke Sites
+            for (const site of fireSites) {
+                const posAttr = site.geo.attributes.position;
+                const arr = posAttr.array;
+                const ageNorms = new Float32Array(site.count);
+                const isSmokes = new Float32Array(site.count);
+
+                for (let i = 0; i < site.count; i++) {
+                    const p = site.particleData[i];
+                    p.age += delta;
+                    if (p.age >= p.maxAge) {
+                        p.age = 0;
+                        p.pos.copy(p.basePos);
+                        p.pos.x += (Math.random() - 0.5) * 0.4;
+                        p.pos.z += (Math.random() - 0.5) * 0.4;
+                    }
+
+                    p.pos.addScaledVector(p.vel, delta);
+                    arr[i * 3 + 0] = p.pos.x;
+                    arr[i * 3 + 1] = p.pos.y;
+                    arr[i * 3 + 2] = p.pos.z;
+
+                    ageNorms[i] = p.age / p.maxAge;
+                    isSmokes[i] = p.isSmoke ? 1.0 : 0.0;
+                }
+
+                site.geo.setAttribute('aAgeNorm', new THREE.BufferAttribute(ageNorms, 1));
+                site.geo.setAttribute('aIsSmoke', new THREE.BufferAttribute(isSmokes, 1));
+                posAttr.needsUpdate = true;
+
+                // Fire flicker
+                site.fireLight.intensity = 3.5 + Math.sin(time * 18.0) * 0.7 + Math.cos(time * 26.0) * 0.5;
+            }
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
