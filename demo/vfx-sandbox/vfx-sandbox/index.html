@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Voxel VFX Test Sandbox (Rust Wasm Engine)</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #070a12; overflow: hidden; font-family: monospace; color: #ddd; }
+    #canvas-container { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+    canvas { width: 100vw; height: 100vh; image-rendering: pixelated; display: block; }
+    #ui {
+      position: fixed; top: 12px; left: 14px; z-index: 10;
+      background: rgba(10, 15, 24, 0.88); padding: 12px 16px; border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.18); box-shadow: 0 4px 16px #000c;
+      pointer-events: auto; max-width: 380px;
+    }
+    h2 { margin: 0 0 6px 0; font-size: 14px; color: #64d2ff; }
+    .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; background: #1e3a5f; color: #aadcff; margin-bottom: 8px; }
+    .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 8px 0; }
+    button {
+      background: #142236; border: 1px solid #2d4f7c; color: #c8e3ff;
+      padding: 6px 8px; border-radius: 4px; font-family: monospace; font-size: 11px;
+      cursor: pointer; transition: 0.15s; text-align: left;
+    }
+    button:hover { background: #203a5e; border-color: #64d2ff; color: #fff; }
+    button.active { background: #007acc; border-color: #aadcff; color: #fff; font-weight: bold; }
+    .info { font-size: 11px; line-height: 1.45; color: #8fa3bf; margin-top: 8px; border-top: 1px solid #1a2a40; padding-top: 6px; }
+    #perf { position: fixed; bottom: 12px; left: 14px; font-size: 11px; color: #7f9bb3; background: #090e17c0; padding: 4px 8px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <div id="canvas-container">
+    <canvas id="c" width="640" height="360"></canvas>
+  </div>
+
+  <div id="ui">
+    <h2>Voxel VFX Test Sandbox</h2>
+    <div class="badge">Rust Wasm Engine (0 WebGPU Dependency - 60 FPS Guaranteed)</div>
+    <div style="font-size: 11px; color: #cbd6e2;">Aşağıdaki test butonlarıyla efektleri tetikleyin:</div>
+
+    <div class="btn-grid">
+      <button id="btn-sparks" class="active">1. Seken Kıvılcımlar (SPARK)</button>
+      <button id="btn-explosion">2. Hacimsel Patlama & Şok</button>
+      <button id="btn-fire">3. Gerçekçi Voxel Alev (Fire)</button>
+      <button id="btn-smoke">4. Yükselen Duman (Smoke)</button>
+      <button id="btn-water">5. Voxel Dere & Damla (Water)</button>
+      <button id="btn-magic">6. Büyü / Enerji (NovaShader)</button>
+    </div>
+
+    <div class="info">
+      <strong>Kontroller:</strong><br>
+      • <strong>Sol Tık / Sürükle:</strong> Kamerayı Döndür<br>
+      • <strong>WASD / Uzay / C:</strong> Serbest Uçuş Kamerası<br>
+      • <strong>1 - 6 Tuşları:</strong> Efekt Değiştir<br>
+      • <strong>Boşluk (veya tık):</strong> Seçili Vfx'i Zemin Üzerine Patlat
+    </div>
+  </div>
+
+  <div id="perf">Rust Wasm Yükleniyor...</div>
+
+<script type="module">
+import init, { VfxWorld } from '../pkg-vfx/vfx_wasm.js';
+
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const perfEl = document.getElementById('perf');
+
+const W = 640;
+const H = 360;
+
+// Initialize Rust Wasm
+const wasm = await init();
+const world = new VfxWorld(W, H);
+console.log('[VFX Wasm] Initialized successfully.');
+
+const imageData = ctx.createImageData(W, H);
+
+// Camera state
+const cam = { x: 0, y: 7.5, z: -15.0, yaw: 0.0, pitch: -0.32, speed: 10.0 };
+const keys = {};
+window.addEventListener('keydown', (e) => {
+  keys[e.code] = true;
+  keys[e.key.toLowerCase()] = true;
+});
+window.addEventListener('keyup', (e) => {
+  keys[e.code] = false;
+  keys[e.key.toLowerCase()] = false;
+});
+
+let dragging = false;
+canvas.addEventListener('mousedown', () => dragging = true);
+window.addEventListener('mouseup', () => dragging = false);
+window.addEventListener('mousemove', (e) => {
+  if (dragging) {
+    cam.yaw += e.movementX * 0.0035;
+    cam.pitch = Math.max(-1.4, Math.min(1.4, cam.pitch - e.movementY * 0.0035));
+  }
+});
+
+let activeMode = 1;
+const btnIds = ['btn-sparks', 'btn-explosion', 'btn-fire', 'btn-smoke', 'btn-water', 'btn-magic'];
+btnIds.forEach((id, idx) => {
+  document.getElementById(id).addEventListener('click', () => {
+    activeMode = idx + 1;
+    btnIds.forEach(b => document.getElementById(b).classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    world.trigger_burst(activeMode, 350);
+  });
+});
+
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'Digit1') document.getElementById('btn-sparks').click();
+  if (e.code === 'Digit2') document.getElementById('btn-explosion').click();
+  if (e.code === 'Digit3') document.getElementById('btn-fire').click();
+  if (e.code === 'Digit4') document.getElementById('btn-smoke').click();
+  if (e.code === 'Digit5') document.getElementById('btn-water').click();
+  if (e.code === 'Digit6') document.getElementById('btn-magic').click();
+  if (e.code === 'Space') world.trigger_burst(activeMode, 350);
+});
+
+canvas.addEventListener('click', () => {
+  world.trigger_burst(activeMode, 350);
+});
+
+// Render loop
+let lastTime = performance.now();
+let frameCount = 0, fpsTime = 0;
+
+function loop(now) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (now - lastTime) / 1000);
+  lastTime = now;
+
+  frameCount++;
+  fpsTime += dt;
+  if (fpsTime >= 0.5) {
+    perfEl.textContent = `${(frameCount / fpsTime).toFixed(0)} FPS | Rust Wasm Engine | Aktif Efekt: ${activeMode}`;
+    frameCount = 0; fpsTime = 0;
+  }
+
+  // Camera flying
+  const fwd = (keys.KeyW || keys.w ? 1 : 0) - (keys.KeyS || keys.s ? 1 : 0);
+  const str = (keys.KeyD || keys.d ? 1 : 0) - (keys.KeyA || keys.a ? 1 : 0);
+  const v = cam.speed * dt;
+  cam.x += (Math.sin(cam.yaw) * fwd + Math.cos(cam.yaw) * str) * v;
+  cam.z += (Math.cos(cam.yaw) * fwd - Math.sin(cam.yaw) * str) * v;
+  if (keys.KeyE || keys.e) cam.y += v;
+  if (keys.KeyC || keys.c || keys.KeyQ || keys.q) cam.y -= v;
+
+  // Update Rust Camera
+  world.set_camera(cam.x, cam.y, cam.z, cam.yaw, cam.pitch);
+
+  // Step simulation & render directly to Wasm linear memory
+  world.update_and_render(dt);
+
+  // Direct memory view into canvas (zero copy overhead)
+  const ptr = world.get_framebuffer_ptr();
+  const wasmPixels = new Uint8ClampedArray(wasm.memory.buffer, ptr, W * H * 4);
+  imageData.data.set(wasmPixels);
+  ctx.putImageData(imageData, 0, 0);
+}
+
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
