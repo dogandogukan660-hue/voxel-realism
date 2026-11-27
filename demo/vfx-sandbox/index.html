@@ -15,16 +15,16 @@
     top: 16px;
     left: 16px;
     z-index: 10;
-    background: rgba(10, 14, 20, 0.88);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(10, 14, 20, 0.90);
+    backdrop-filter: blur(14px);
+    border: 1px solid rgba(255, 255, 255, 0.14);
     border-radius: 12px;
     padding: 16px 20px;
-    max-width: 440px;
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
+    max-width: 460px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.75);
   }
   h1 { font-size: 17px; font-weight: 700; color: #ffaa33; margin-bottom: 4px; letter-spacing: 0.5px; }
-  .subtitle { font-size: 11px; color: #8899aa; margin-bottom: 12px; }
+  .subtitle { font-size: 11px; color: #8899aa; margin-bottom: 12px; line-height: 1.4; }
   
   .mode-selector { display: flex; gap: 6px; margin-bottom: 12px; }
   .btn-mode {
@@ -32,7 +32,7 @@
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.12);
     color: #ccc;
-    padding: 8px 10px;
+    padding: 8px 8px;
     font-size: 11px;
     font-weight: 600;
     border-radius: 6px;
@@ -54,13 +54,13 @@
 
 <div id="ui-overlay">
   <h1>VOXEL REALISM • PHYSICAL VFX</h1>
-  <div class="subtitle">Gerçek Dünya Fiziği: Yanan Voxel Kasa, Dalgalı Köpüklü Deniz, Termobarik Patlama</div>
+  <div class="subtitle">Gerçek Akışkan Fiziği: Kasaya Tutunan Doğal Alev, Şeffaf & Kırılmalı Su, TNT Toz & Dev Ateş Topu</div>
   
   <div class="mode-selector">
-    <button class="btn-mode active" id="btn-fire">1. Yanan Kasa</button>
-    <button class="btn-mode" id="btn-explosion">2. Patlama</button>
-    <button class="btn-mode" id="btn-smoke">3. Kara Duman</button>
-    <button class="btn-mode" id="btn-water">4. Köpüklü Deniz</button>
+    <button class="btn-mode active" id="btn-fire">1. Kasayı Saran Alev</button>
+    <button class="btn-mode" id="btn-explosion">2. TNT & Toz Patlaması</button>
+    <button class="btn-mode" id="btn-smoke">3. Akışkan Duman</button>
+    <button class="btn-mode" id="btn-water">4. Şeffaf Köpüklü Su</button>
   </div>
 
   <div class="controls-info">
@@ -70,7 +70,7 @@
     <div>• <span class="kbd">Boşluk / Sol Tık</span> Patlamayı Tetikle</div>
   </div>
 
-  <div id="perf-stats">60 FPS | Raymarching Başlatılıyor...</div>
+  <div id="perf-stats">60 FPS | Akışkan Simülasyonu Devrede</div>
 </div>
 
 <script>
@@ -118,7 +118,7 @@ window.addEventListener('mousemove', (e) => {
   }
 });
 
-let activeMode = 1; // 1: Crate Fire, 2: Explosion, 3: Smoke, 4: Sea Water
+let activeMode = 1; // 1: Crate Fire, 2: TNT Explosion, 3: Fluid Smoke, 4: Clear Water
 let explosionTime = -1.0;
 
 function setMode(mode, btnId) {
@@ -162,7 +162,7 @@ void main() {
 `;
 
 // ----------------------------------------------------------------------------
-// Physically Grounded Raymarcher Fragment Shader
+// Physically Grounded Raymarcher Fragment Shader with Curl Noise Fluids
 // ----------------------------------------------------------------------------
 const FS_SOURCE = `#version 300 es
 precision highp float;
@@ -206,9 +206,21 @@ float fbm3(vec3 p) {
   return f;
 }
 
-// ----------------------------------------------------------------------------
-// AABB Intersection for Solid Voxel Crate
-// ----------------------------------------------------------------------------
+// Divergence-Free Curl Noise for Incompressible Fluid Dynamics (Navier-Stokes eddy rolls)
+vec3 computeCurl(vec3 p) {
+  float eps = 0.08;
+  float dx = fbm3(p + vec3(eps, 0.0, 0.0)) - fbm3(p - vec3(eps, 0.0, 0.0));
+  float dy = fbm3(p + vec3(0.0, eps, 0.0)) - fbm3(p - vec3(0.0, eps, 0.0));
+  float dz = fbm3(p + vec3(0.0, 0.0, eps)) - fbm3(p - vec3(0.0, 0.0, eps));
+  return vec3(dy - dz, dz - dx, dx - dy) * 1.6;
+}
+
+// Box Signed Distance Function
+float sdBox(vec3 p, vec3 b) {
+  vec3 q = abs(p) - b;
+  return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
+}
+
 vec2 intersectBox(vec3 ro, vec3 rd, vec3 boxMin, vec3 boxMax) {
   vec3 t0 = (boxMin - ro) / rd;
   vec3 t1 = (boxMax - ro) / rd;
@@ -237,25 +249,25 @@ float getOceanHeight(vec2 p, float t) {
   
   // Wave Train 1 (Dominant swell)
   vec2 d1 = vec2(0.8, 0.6);
-  float w1 = 1.2, s1 = 2.0, a1 = 0.32;
+  float w1 = 1.2, s1 = 2.0, a1 = 0.28;
   float x1 = dot(d1, p) * w1 + t * s1;
   h += a1 * pow(sin(x1) * 0.5 + 0.5, 2.2);
 
   // Wave Train 2 (Cross sea)
   vec2 d2 = vec2(-0.7, 0.7);
-  float w2 = 2.4, s2 = 2.8, a2 = 0.16;
+  float w2 = 2.4, s2 = 2.8, a2 = 0.14;
   float x2 = dot(d2, p) * w2 + t * s2;
   h += a2 * pow(sin(x2) * 0.5 + 0.5, 1.8);
 
   // Wave Train 3 (High-frequency chop)
   vec2 d3 = vec2(0.2, -0.98);
-  float w3 = 4.8, s3 = 4.2, a3 = 0.07;
+  float w3 = 4.8, s3 = 4.2, a3 = 0.06;
   float x3 = dot(d3, p) * w3 + t * s3;
   h += a3 * sin(x3);
 
   // Wave Train 4 (Capillary ripples)
   vec2 d4 = vec2(-0.9, -0.4);
-  float w4 = 9.5, s4 = 5.5, a4 = 0.03;
+  float w4 = 9.5, s4 = 5.5, a4 = 0.025;
   float x4 = dot(d4, p) * w4 + t * s4;
   h += a4 * sin(x4);
 
@@ -278,7 +290,6 @@ void main() {
 
   vec3 fwd = vec3(sy * cp, sp, cy * cp);
   vec3 right = vec3(cy, 0.0, -sy);
-  // Correct up-vector: fwd cross right points +Y (sky up, ground down)
   vec3 up = cross(fwd, right);
   vec3 rd = normalize(fwd + right * ndc.x + up * ndc.y);
   vec3 ro = u_camPos;
@@ -288,16 +299,16 @@ void main() {
   float sunDot = max(0.0, dot(rd, sunDir));
   float skyT = clamp(rd.y * 1.5 + 0.05, 0.0, 1.0);
   vec3 skyCol = mix(vec3(0.02, 0.03, 0.06), vec3(0.08, 0.16, 0.28), skyT);
-  skyCol += vec3(1.0, 0.8, 0.5) * pow(sunDot, 64.0) * 1.5; // Sun disc
+  skyCol += vec3(1.0, 0.85, 0.6) * pow(sunDot, 64.0) * 1.5; // Sun disc
 
   vec3 col = skyCol;
   float sceneDepth = 1e5;
 
   // --------------------------------------------------------------------------
-  // 1. SOLID SCENE GEOMETRY: GROUND PLANE & BURNING VOXEL CRATE
+  // 1. SOLID SCENE GEOMETRY: GROUND PLANE & VOXEL WOODEN CRATE
   // --------------------------------------------------------------------------
   
-  // A. Ground Plane at Y = 0.0 (Only for Modes 1, 2, 3)
+  // A. Ground Plane at Y = 0.0 (Modes 1, 2, 3)
   if (u_mode != 4) {
     if (rd.y < -1e-4) {
       float tG = -ro.y / rd.y;
@@ -306,11 +317,10 @@ void main() {
         vec3 pG = ro + rd * tG;
         float dToCenter = length(pG.xz);
 
-        // Charred scorched ground around burning crate
-        float scorch = smoothstep(2.5, 0.4, dToCenter);
-        vec3 dirt = mix(vec3(0.09, 0.08, 0.07), vec3(0.02, 0.015, 0.015), scorch);
+        // Ground Texturing (Charred scorched soil around burning object)
+        float scorch = smoothstep(2.5, 0.35, dToCenter);
+        vec3 dirt = mix(vec3(0.10, 0.09, 0.08), vec3(0.02, 0.015, 0.015), scorch);
         
-        // Voxel cobble / soil grain
         float tile = noise3D(vec3(pG.xz * 2.5, 0.0));
         dirt += (tile - 0.5) * 0.025;
 
@@ -329,9 +339,11 @@ void main() {
   }
 
   // B. Physical Voxel Wooden Crate (Sitting at Center, Modes 1, 2, 3)
-  // Crate Bounds: X [-0.55, 0.55], Y [0.0, 0.9], Z [-0.55, 0.55]
-  vec3 crateMin = vec3(-0.55, 0.0, -0.55);
-  vec3 crateMax = vec3(0.55, 0.9, 0.55);
+  // Crate Center: (0.0, 0.45, 0.0), Half Extents: (0.55, 0.45, 0.55)
+  vec3 crateCenter = vec3(0.0, 0.45, 0.0);
+  vec3 crateHalf = vec3(0.55, 0.45, 0.55);
+  vec3 crateMin = crateCenter - crateHalf;
+  vec3 crateMax = crateCenter + crateHalf;
   vec2 crateHit = intersectBox(ro, rd, crateMin, crateMax);
 
   if (crateHit.x > 0.0 && crateHit.x < crateHit.y && crateHit.x < sceneDepth) {
@@ -340,7 +352,6 @@ void main() {
     vec3 nC = getBoxNormal(pC, crateMin, crateMax);
 
     // Voxel Wooden Crate Shading
-    // 16-voxel grid resolution per block face
     vec3 localP = (pC - crateMin) / (crateMax - crateMin); // 0 to 1
     vec3 vCell = floor(localP * 16.0) / 16.0;
 
@@ -356,38 +367,35 @@ void main() {
 
     // Wooden plank striping
     float plank = fract(localP.y * 5.0);
-    if (plank < 0.05) crateColor *= 0.5; // Plank groove
+    if (plank < 0.05) crateColor *= 0.5;
 
     if (isCorner) {
-      // Iron corner bracket
       crateColor = vec3(0.08, 0.09, 0.10);
-      // Rivets
       float rivet = length(fract(vCell.xy * 8.0) - 0.5);
       if (rivet < 0.2) crateColor = vec3(0.18, 0.20, 0.22);
     }
 
-    // BURNING CRATE PHYSICS (Ateş Kasayı Yakıyor)
+    // BURNING CRATE SURFACE PHYSICS (Ateş kasayı yakıyor, ahşap közleşiyor)
     if (u_mode == 1) {
-      // Burning progress: top half and roof are heavily charred and glowing
-      float burnHeat = smoothstep(0.3, 0.9, pC.y);
+      // Burn pattern follows organic ignition on the right/top corner
+      float ignitionZone = smoothstep(-0.4, 0.5, pC.x + pC.z * 0.4) * smoothstep(0.1, 0.9, pC.y);
       float charN = noise3D(pC * 6.0);
       
       // Black carbon crust
-      crateColor = mix(crateColor, vec3(0.02, 0.02, 0.02), burnHeat * 0.92);
+      crateColor = mix(crateColor, vec3(0.015, 0.015, 0.015), ignitionZone * 0.94);
 
-      // Deep combustion fissure veins (Közleşen ahşap çatlakları)
-      float fissure = pow(noise3D(vec3(pC * 12.0 + vec3(0.0, u_time * 0.5, 0.0))), 2.2);
-      vec3 glowingVeins = vec3(3.8, 1.1, 0.08) * fissure * burnHeat * 2.8;
+      // Deep combustion fissure veins (Akkor köz çatlakları)
+      float fissure = pow(noise3D(vec3(pC * 12.0 + vec3(0.0, u_time * 0.6, 0.0))), 2.2);
+      vec3 glowingVeins = vec3(4.0, 1.2, 0.08) * fissure * ignitionZone * 3.0;
       crateColor += glowingVeins;
     }
 
-    // Directional shading
     float diff = max(0.1, dot(nC, sunDir));
     crateColor *= (diff * 0.8 + 0.2);
 
     // Dynamic fire point light illumination onto crate
     if (u_mode == 1) {
-      vec3 lightPos = vec3(0.0, 1.4, 0.0);
+      vec3 lightPos = vec3(0.2, 1.1, 0.2);
       vec3 toL = lightPos - pC;
       float dL = length(toL);
       float fireLight = max(0.0, dot(nC, toL / dL)) / (1.0 + dL * dL * 1.5);
@@ -399,23 +407,21 @@ void main() {
   }
 
   // --------------------------------------------------------------------------
-  // 2. ULTRA-REALISTIC GERSTNER OCEAN WATER WITH FOAM (MODE 4)
+  // 2. ULTRA-REALISTIC TRANSPARENT WATER WITH REFRACTION & SEABED (MODE 4)
   // --------------------------------------------------------------------------
   if (u_mode == 4) {
-    // Raymarch the undulating water surface
+    // Raymarch undulating water surface
     float tWater = 0.0;
     float dtW = 0.12;
     vec3 pW = ro;
     bool hitWater = false;
     float waterH = 0.0;
 
-    // Fast bounding intersection for water layer Y in [-0.2, 0.9]
     for (int i = 0; i < 48; i++) {
       tWater += dtW;
       pW = ro + rd * tWater;
       waterH = getOceanHeight(pW.xz, u_time);
       if (pW.y < waterH) {
-        // Refine intersection
         tWater -= dtW * 0.5;
         pW = ro + rd * tWater;
         waterH = getOceanHeight(pW.xz, u_time);
@@ -428,38 +434,53 @@ void main() {
       vec3 waterP = ro + rd * tWater;
       vec3 N = getOceanNormal(waterP.xz, u_time, waterH);
 
-      // Optical calculations
+      // Water optics: Index of refraction n = 1.333
       float cosTheta = clamp(dot(-rd, N), 0.0, 1.0);
-      // Schlick Fresnel
+      // Schlick Fresnel: At grazing angles water reflects like a mirror, looking down it is transparent
       float F = 0.02 + 0.98 * pow(1.0 - cosTheta, 5.0);
 
-      // Deep Water Beer-Lambert Extinction (Kristal berrak turkuazdan derin okyanus mavisine)
-      vec3 deepSeaCol = vec3(0.015, 0.065, 0.12);
-      vec3 shallowTurquoise = vec3(0.04, 0.32, 0.42);
-      vec3 waterBody = mix(deepSeaCol, shallowTurquoise, clamp(waterH * 1.6 + 0.2, 0.0, 1.0));
+      // 1. REFRACTION: RAY CONTINUES DOWN INTO THE WATER TO HIT SEABED AT Y = -1.5
+      vec3 refrRay = refract(rd, N, 1.0 / 1.333);
+      if (length(refrRay) < 0.1) refrRay = rd; // Total internal reflection fallback
+      
+      float tFloor = (-1.5 - waterP.y) / min(refrRay.y, -0.05);
+      vec3 floorP = waterP + refrRay * tFloor;
 
-      // Sun specular glint (Micro-facet wave reflection)
-      vec3 H = normalize(sunDir - rd);
-      float spec = pow(max(0.0, dot(N, H)), 180.0) * 4.5;
-      vec3 sunSpec = vec3(1.0, 0.9, 0.7) * spec;
+      // Submerged sandy seabed with pebbles
+      vec3 sandColor = vec3(0.55, 0.48, 0.35); // Real natural sand
+      float sandGrain = noise3D(vec3(floorP.xz * 3.0, 0.0));
+      sandColor += (sandGrain - 0.5) * 0.05;
 
-      // Sky reflection
-      vec3 skyRefl = mix(vec3(0.05, 0.12, 0.22), vec3(0.45, 0.65, 0.85), clamp(reflect(rd, N).y * 1.2 + 0.2, 0.0, 1.0));
+      // Animated underwater sunlight caustics dancing on the seabed
+      float caust1 = pow(noise3D(vec3(floorP.xz * 2.8 - vec2(u_time * 0.6), u_time * 0.4)), 3.0);
+      float caust2 = pow(noise3D(vec3(floorP.xz * 4.2 + vec2(u_time * 0.5), u_time * 0.6)), 3.0);
+      float caustics = (caust1 + caust2) * 5.5;
 
-      vec3 finalWater = mix(waterBody, skyRefl, F) + sunSpec;
+      vec3 floorLit = sandColor * (0.6 + caustics * 0.4);
 
-      // DYNAMIC SEA FOAM (KÖPÜKLENME) ON WAVE CRESTS
-      // 1. Crest steepness: high wave displacement + sharp curvature
-      float crest = smoothstep(0.28, 0.52, waterH);
-      // 2. High-frequency turbulent foam texture
+      // Water transmission absorption (GENTLE, TRANSPARENT, NOT PAINTED BLUE!)
+      // Water absorbs red slightly over distance; shallow water is crystal clear
+      float waterDepth = length(floorP - waterP);
+      vec3 waterTransmit = exp(-vec3(0.12, 0.04, 0.015) * waterDepth * 0.8);
+      vec3 underWater = floorLit * waterTransmit;
+
+      // 2. REFLECTION: SAMPLES SKY & SUN HIGHLIGHT
+      vec3 reflRay = reflect(rd, N);
+      float reflSunDot = max(0.0, dot(reflRay, sunDir));
+      vec3 skyRefl = mix(vec3(0.04, 0.08, 0.15), vec3(0.20, 0.40, 0.65), clamp(reflRay.y * 1.5 + 0.1, 0.0, 1.0));
+      skyRefl += vec3(1.0, 0.9, 0.7) * pow(reflSunDot, 128.0) * 4.0; // Sun glint on water surface
+
+      // Combine Transparent Refraction + Mirror Fresnel Reflection
+      vec3 finalWater = mix(underWater, skyRefl, F);
+
+      // 3. DYNAMIC WHITE SEA FOAM (KÖPÜKLENME) ON WAVE CRESTS
+      float crest = smoothstep(0.26, 0.48, waterH);
       float foamTurb = noise3D(vec3(waterP.xz * 6.5, u_time * 1.8));
       float foamLace = noise3D(vec3(waterP.xz * 18.0 - vec2(u_time * 0.5), u_time * 0.8));
-      
       float foamMask = smoothstep(0.42, 0.72, crest + foamTurb * 0.4 + foamLace * 0.25);
 
-      // White aerated sea foam with sub-surface scattering
-      vec3 foamColor = vec3(0.92, 0.96, 1.0) * (1.2 + foamTurb * 0.3);
-      finalWater = mix(finalWater, foamColor, foamMask * 0.92);
+      vec3 foamColor = vec3(0.95, 0.98, 1.0) * (1.1 + foamTurb * 0.3);
+      finalWater = mix(finalWater, foamColor, foamMask * 0.90);
 
       // Distance water haze
       float fogW = exp(-tWater * 0.04);
@@ -469,7 +490,7 @@ void main() {
   }
 
   // --------------------------------------------------------------------------
-  // 3. PHYSICAL VOLUMETRIC FLUID RAYMARCHER (Fire, Explosion, Smoke)
+  // 3. PHYSICAL VOLUMETRIC FLUID RAYMARCHER (True Navier-Stokes Curl Eddies)
   // --------------------------------------------------------------------------
   float tStart = 0.5;
   float tEnd = min(sceneDepth, 14.0);
@@ -483,117 +504,164 @@ void main() {
     vec3 pos = ro + rd * t;
 
     // ------------------------------------------------------------------------
-    // MODE 1: REALISTIC COMBUSTION FIRE ON VOXEL CRATE (Kasayı Yakan Canlı Ateş)
+    // MODE 1: OBJECT-HUGGING BOUNDARY-LAYER FIRE (Ateş Kasayı Sarar, Şeklini Alır)
     // ------------------------------------------------------------------------
     if (u_mode == 1) {
-      // Fire sits directly on top of the voxel crate (Y=0.7 to Y=4.0)
-      float h = pos.y - 0.7; // Height above crate top
-      if (h >= -0.2 && h <= 3.6) {
-        float r = length(pos.xz);
-        
-        // Base flame footprint matches the top perimeter of the crate
-        float maxR = (0.75 - h * 0.18) * (1.0 + 0.15 * sin(h * 3.5));
+      // 1. Distance to crate surface
+      float dCrate = sdBox(pos - crateCenter, crateHalf);
+      
+      // Fire exists in the boundary layer adhering tightly to the crate surfaces (-0.05 to +0.25)
+      // and drafts upward above the crate (pos.y > 0.9)
+      float hAboveCrate = pos.y - 0.9;
+      
+      // Flame adheres to the burning wooden faces
+      float boundarySheath = abs(dCrate - 0.05);
 
-        // Buoyant fluid convection: velocity increases with height + organic swirl
-        vec3 flowPos = pos * 1.9 - vec3(0.0, u_time * 4.6 + sqrt(max(0.0, h) + 0.1) * 2.2, 0.0);
-        float turb = fbm3(flowPos);
+      // Selective organic ignition: Fire originates on the right-corner/top and licks around the box
+      float ignitionZone = smoothstep(-0.35, 0.45, pos.x + pos.z * 0.45) * smoothstep(0.1, 0.9, pos.y);
 
-        float flameShape = (maxR - r + turb * 0.52);
+      // Convective upward fluid draft + Divergence-free Curl Noise
+      vec3 curlV = computeCurl(pos * 1.6 + vec3(0.0, -u_time * 3.8, 0.0));
+      vec3 fluidPos = pos + curlV * 0.28;
 
-        if (flameShape > 0.0) {
-          float coreDensity = smoothstep(0.0, 0.35, flameShape);
-          vec3 flameCol = vec3(0.0);
+      // Flame attachment logic:
+      // While on the crate: clings tightly to the wood faces
+      // Above the crate: narrows into convective buoyant tongues
+      float flameSkin = smoothstep(0.24, 0.0, boundarySheath) * ignitionZone;
 
-          if (h < 0.25) {
-            // Blue/Violet Pre-combustion root flame hugging the wooden surface
-            flameCol = vec3(0.2, 0.7, 3.2) * 3.5 * coreDensity;
-          } else if (h < 2.0) {
-            // Incandescent soot combustion (1300°C luminous yellow core)
-            float tempFade = 1.0 - (h - 0.25) / 1.75;
-            vec3 coreYellow = vec3(3.6, 2.6, 0.7);
-            vec3 outerOrange = vec3(2.6, 0.75, 0.05);
-            flameCol = mix(outerOrange, coreYellow, tempFade * coreDensity);
-          } else {
-            // Cooling soot tip transforming into smoke
-            float coolFade = (h - 2.0) / 1.6;
-            vec3 darkRed = vec3(1.1, 0.16, 0.02);
-            vec3 sootSmoke = vec3(0.02, 0.02, 0.025);
-            flameCol = mix(darkRed, sootSmoke, coolFade);
-          }
+      // Vertical plume rising from the top edges of the crate
+      float plumeR = length(pos.xz - vec2(0.15, 0.15));
+      float topPlume = 0.0;
+      if (hAboveCrate > 0.0 && hAboveCrate < 2.5) {
+        float maxPlumeR = (0.55 - hAboveCrate * 0.18) * (1.0 + 0.2 * sin(hAboveCrate * 4.0));
+        float turb = fbm3(fluidPos * 2.2 - vec3(0.0, u_time * 4.5, 0.0));
+        topPlume = smoothstep(maxPlumeR, maxPlumeR - 0.4, plumeR + turb * 0.45);
+      }
 
-          float opacity = flameShape * 0.44;
-          volAcc.rgb += flameCol * opacity * (1.0 - volAcc.a);
-          volAcc.a += opacity * (1.0 - volAcc.a);
+      float totalFlame = max(flameSkin * 1.2, topPlume);
+
+      if (totalFlame > 0.01) {
+        // Multi-temperature combustion chemistry:
+        // Blue root flame clinging directly to the wood pyrolysis surface
+        // Incandescent yellow core (1300°C)
+        // Orange convective curls
+        // Soot/smoke at tips
+        vec3 flameCol = vec3(0.0);
+        float coreDensity = smoothstep(0.05, 0.45, totalFlame);
+
+        if (dCrate < 0.08 && pos.y < 0.95) {
+          // Pre-mixed blue reaction zone hugging the wood surface (1400°C)
+          flameCol = mix(vec3(0.2, 0.8, 3.5), vec3(3.6, 2.8, 0.8), coreDensity);
+        } else if (hAboveCrate < 1.4) {
+          // Luminous incandescent soot core
+          float tGrad = clamp(1.0 - hAboveCrate / 1.4, 0.0, 1.0);
+          vec3 brightYellow = vec3(3.8, 2.7, 0.8);
+          vec3 outerOrange = vec3(2.8, 0.8, 0.06);
+          flameCol = mix(outerOrange, brightYellow, tGrad * coreDensity);
+        } else {
+          // Cooling soot tips transforming into dark carbon smoke
+          float coolGrad = clamp((hAboveCrate - 1.4) / 1.1, 0.0, 1.0);
+          vec3 deepRed = vec3(1.2, 0.18, 0.02);
+          vec3 soot = vec3(0.025, 0.025, 0.025);
+          flameCol = mix(deepRed, soot, coolGrad);
         }
+
+        float opacity = totalFlame * 0.46;
+        volAcc.rgb += flameCol * opacity * (1.0 - volAcc.a);
+        volAcc.a += opacity * (1.0 - volAcc.a);
       }
     }
 
     // ------------------------------------------------------------------------
-    // MODE 2: THERMOBARIC GROUND DETONATION & MUSHROOM CLOUD
+    // MODE 2: HIGH-EXPLOSIVE TNT BLAST WITH GROUND DUST EJECTA & GIANT FIREBALL
     // ------------------------------------------------------------------------
     else if (u_mode == 2 && u_expTime >= 0.0) {
       float et = u_expTime;
 
-      // STAGE 1: HYPER-INTENSE GROUND FLASH (0.0s - 0.25s)
-      if (et < 0.25) {
-        float blastR = (et / 0.25) * 3.8;
-        vec3 pExpl = pos - vec3(0.0, 0.45, 0.0);
-        float d = length(pExpl);
+      // STAGE 1: HYPERSONIC DETONATION FLASH (0.0s - 0.18s)
+      if (et < 0.18) {
+        float blastR = (et / 0.18) * 3.5;
+        float d = length(pos - vec3(0.0, 0.45, 0.0));
         if (d < blastR) {
-          float intens = (1.0 - d / blastR) * 8.0;
-          vec3 flashCol = vec3(3.0, 2.7, 2.0) * intens;
-          float alpha = clamp(intens * 0.65, 0.0, 1.0);
+          float intens = (1.0 - d / blastR) * 9.0;
+          vec3 flashCol = vec3(3.2, 2.9, 2.2) * intens;
+          float alpha = clamp(intens * 0.7, 0.0, 1.0);
           volAcc.rgb += flashCol * alpha * (1.0 - volAcc.a);
           volAcc.a += alpha * (1.0 - volAcc.a);
         }
       }
 
-      // STAGE 2: EXPANDING TOROIDAL FIRE VORTEX (0.25s - 2.2s)
-      else if (et < 2.2) {
-        float progress = (et - 0.25) / 1.95;
-        float liftY = 0.5 + progress * 4.2;
+      // STAGE 2: GIANT BOILING FIREBALL + GROUND SOIL/DUST EJECTA RING (0.18s - 2.5s)
+      else if (et < 2.5) {
+        float progress = (et - 0.18) / 2.32;
+
+        // A. GIANT FIREBALL IN CENTER (Dev Ateş Topu)
+        float liftY = 0.6 + progress * 3.5;
         vec3 fireballCenter = vec3(0.0, liftY, 0.0);
         vec3 relP = pos - fireballCenter;
+        float distToFireball = length(relP);
 
-        float rH = length(relP.xz);
-        // Toroidal ring vortex structure
-        float torusDist = length(vec2(rH - 1.3 * (1.0 + progress * 0.8), relP.y * 1.3)) - 1.2 * (1.0 + progress * 0.6);
+        // Fluid Curl-noise vorticity rolls
+        vec3 curlV = computeCurl(relP * 1.4 - vec3(0.0, et * 3.2, 0.0));
+        float turb = fbm3((relP + curlV * 0.4) * 1.5);
 
-        vec3 flowN = relP * 1.3 - vec3(0.0, et * 3.0, 0.0);
-        float turb = fbm3(flowN);
-
-        float fireDensity = smoothstep(0.4, -0.6, torusDist + turb * 0.95);
+        float fireballR = 1.6 * (1.0 + progress * 0.9);
+        float fireDensity = smoothstep(fireballR, fireballR - 0.9, distToFireball + turb * 0.7);
 
         if (fireDensity > 0.01) {
-          vec3 fieryCore = mix(vec3(3.6, 2.9, 1.2), vec3(2.8, 0.85, 0.06), progress);
+          vec3 fieryCore = mix(vec3(3.8, 3.0, 1.4), vec3(2.8, 0.85, 0.06), progress);
           vec3 sootCrust = vec3(0.03, 0.03, 0.035);
-          
-          vec3 finalExpl = mix(fieryCore, sootCrust, smoothstep(0.35, 0.88, progress + turb * 0.28));
+          vec3 finalExpl = mix(fieryCore, sootCrust, smoothstep(0.32, 0.85, progress + turb * 0.3));
 
-          float alpha = fireDensity * 0.58;
+          float alpha = fireDensity * 0.60;
           volAcc.rgb += finalExpl * alpha * (1.0 - volAcc.a);
           volAcc.a += alpha * (1.0 - volAcc.a);
         }
+
+        // B. GROUND SOIL & DUST BLAST EJECTA RING (Toprak & Toz Bulutu)
+        // High-velocity expanding annular dust wave rolling across the ground
+        if (pos.y < 1.3) {
+          float dustSpeed = 2.8;
+          float dustFront = 0.8 + et * dustSpeed;
+          float rGround = length(pos.xz);
+          float ringDist = abs(rGround - dustFront);
+
+          if (ringDist < 1.2) {
+            vec3 dustCoord = pos * 1.8 - vec3(0.0, u_time * 1.2, 0.0);
+            float dustTurb = fbm3(dustCoord);
+            float dustDensity = smoothstep(1.2, 0.0, ringDist) * smoothstep(1.3, 0.1, pos.y);
+            dustDensity *= (1.0 - progress * 0.8);
+
+            if (dustDensity > 0.01) {
+              // Real brown soil, sand, and gravel dust color
+              vec3 soilColor = vec3(0.18, 0.14, 0.10) * (0.8 + dustTurb * 0.4);
+              float alphaDust = dustDensity * 0.55;
+              volAcc.rgb += soilColor * alphaDust * (1.0 - volAcc.a);
+              volAcc.a += alphaDust * (1.0 - volAcc.a);
+            }
+          }
+        }
       }
 
-      // STAGE 3: LINGERING MUSHROOM SMOKE STEM & CAP (2.2s - 8.0s)
+      // STAGE 3: LINGERING BILLOWING SMOKE COLUMN & DUST CANOPY (2.5s - 8.0s)
       else if (et < 8.0) {
-        float progress = (et - 2.2) / 5.8;
-        float smokeTopY = 4.8 + progress * 3.2;
+        float progress = (et - 2.5) / 5.5;
+        float smokeTopY = 4.5 + progress * 3.5;
         vec3 relP = pos - vec3(0.0, smokeTopY, 0.0);
 
         float rH = length(relP.xz);
-        float smokeShape = length(vec2(rH - 1.9 * (1.0 + progress * 0.7), relP.y * 1.4)) - 1.7;
+        float smokeShape = length(vec2(rH - 1.8 * (1.0 + progress * 0.7), relP.y * 1.4)) - 1.7;
 
-        vec3 flowN = relP * 0.85 - vec3(u_time * 0.1, et * 0.5, 0.0);
-        float turb = fbm3(flowN);
+        vec3 curlV = computeCurl(relP * 0.8 - vec3(u_time * 0.2, et * 0.4, 0.0));
+        float turb = fbm3((relP + curlV * 0.3) * 0.9);
 
         float density = smoothstep(0.5, -0.6, smokeShape + turb * 0.85);
 
         if (density > 0.01) {
           float fade = (1.0 - progress);
-          vec3 smokeColor = vec3(0.05, 0.055, 0.065) * (1.0 + turb * 0.35);
-          float alpha = density * fade * 0.40;
+          // Dark soot mixed with pulverized grey soil dust
+          vec3 smokeColor = vec3(0.07, 0.065, 0.06) * (1.1 + turb * 0.35);
+          float alpha = density * fade * 0.42;
 
           volAcc.rgb += smokeColor * alpha * (1.0 - volAcc.a);
           volAcc.a += alpha * (1.0 - volAcc.a);
@@ -602,25 +670,27 @@ void main() {
     }
 
     // ------------------------------------------------------------------------
-    // MODE 3: VOLUMETRIC DENSE INDUSTRIAL SMOKE PLUME
+    // MODE 3: FLUID SIMULATED DENSE INDUSTRIAL SMOKE PLUME
     // ------------------------------------------------------------------------
     else if (u_mode == 3) {
       float h = pos.y;
-      if (h >= 0.0 && h <= 7.0) {
-        float windOffset = h * 0.32;
+      if (h >= 0.0 && h <= 7.2) {
+        float windOffset = h * 0.35;
         vec3 relP = pos - vec3(windOffset, 0.0, 0.0);
         float r = length(relP.xz);
-        float plumeR = 0.38 + h * 0.36;
+        float plumeR = 0.38 + h * 0.38;
 
-        vec3 flowCoord = relP * 1.2 - vec3(u_time * 0.4, u_time * 1.8, 0.0);
-        float turb = fbm3(flowCoord);
+        // Incompressible fluid curl noise eddy rolls
+        vec3 curlV = computeCurl(relP * 1.2 - vec3(u_time * 0.5, u_time * 2.0, 0.0));
+        vec3 fluidCoord = relP + curlV * 0.35;
+        float turb = fbm3(fluidCoord * 1.3);
 
         float smokeDensity = smoothstep(plumeR, plumeR - 0.95, r + turb * 0.68);
 
         if (smokeDensity > 0.01) {
-          float fade = 1.0 - smoothstep(4.2, 7.0, h);
-          vec3 smokeColor = vec3(0.08, 0.09, 0.10) * (1.2 + turb * 0.4);
-          float alpha = smokeDensity * fade * 0.44;
+          float fade = 1.0 - smoothstep(4.5, 7.2, h);
+          vec3 smokeColor = vec3(0.07, 0.075, 0.08) * (1.2 + turb * 0.4);
+          float alpha = smokeDensity * fade * 0.46;
 
           volAcc.rgb += smokeColor * alpha * (1.0 - volAcc.a);
           volAcc.a += alpha * (1.0 - volAcc.a);
@@ -699,7 +769,7 @@ function render(now) {
   frames++;
   fpsTime += dt;
   if (fpsTime >= 0.5) {
-    perfEl.textContent = `${(frames / fpsTime).toFixed(0)} FPS | Gerçek Dünya Fizik Simülasyonu | Mod: ${activeMode}`;
+    perfEl.textContent = `${(frames / fpsTime).toFixed(0)} FPS | Akışkan Simülasyonu Devrede | Mod: ${activeMode}`;
     frames = 0; fpsTime = 0;
   }
 
@@ -733,7 +803,7 @@ function render(now) {
 }
 
 requestAnimationFrame(render);
-console.log('[Voxel Realism Physical Engine] Initialized and running at 60 FPS.');
+console.log('[Voxel Realism Physical Engine] Fluid curl simulation active at 60 FPS.');
 </script>
 </body>
 </html>
