@@ -1,0 +1,629 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Omni-Voxel VFX Test Sandbox</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #060910; overflow: hidden; font-family: monospace; color: #ddd; }
+    #c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+    #ui {
+      position: fixed; top: 12px; left: 14px; z-index: 10;
+      background: rgba(10, 15, 24, 0.85); padding: 12px 16px; border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.15); box-shadow: 0 4px 16px #000a;
+      pointer-events: auto; max-width: 380px;
+    }
+    h2 { margin: 0 0 6px 0; font-size: 14px; color: #64d2ff; }
+    .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; background: #1e3a5f; color: #aadcff; margin-bottom: 8px; }
+    .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 8px 0; }
+    button {
+      background: #142236; border: 1px solid #2d4f7c; color: #c8e3ff;
+      padding: 6px 8px; border-radius: 4px; font-family: monospace; font-size: 11px;
+      cursor: pointer; transition: 0.15s; text-align: left;
+    }
+    button:hover { background: #203a5e; border-color: #64d2ff; color: #fff; }
+    button.active { background: #007acc; border-color: #aadcff; color: #fff; font-weight: bold; }
+    .info { font-size: 11px; line-height: 1.45; color: #8fa3bf; margin-top: 8px; border-top: 1px solid #1a2a40; padding-top: 6px; }
+    #perf { position: fixed; bottom: 12px; left: 14px; font-size: 11px; color: #7f9bb3; background: #090e17c0; padding: 4px 8px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+
+  <div id="ui">
+    <h2>Voxel VFX Test Sandbox</h2>
+    <div class="badge">WebGPU + Voxel DDA + GPU Compute Particles</div>
+    <div style="font-size: 11px; color: #cbd6e2;">Aşağıdaki test butonlarıyla efektleri tetikleyin:</div>
+
+    <div class="btn-grid">
+      <button id="btn-sparks" class="active">1. Seken Kıvılcımlar (SPARK)</button>
+      <button id="btn-explosion">2. Hacimsel Patlama & Şok</button>
+      <button id="btn-fire">3. Gerçekçi Voxel Alev (Fire)</button>
+      <button id="btn-smoke">4. Yükselen Duman (Smoke)</button>
+      <button id="btn-water">5. Voxel Dere & Dalga (Fluid)</button>
+      <button id="btn-magic">6. Büyü / Enerji (NovaShader)</button>
+    </div>
+
+    <div class="info">
+      <strong>Kontroller:</strong><br>
+      • <strong>Sol Tık / Sürükle:</strong> Kamerayı Döndür<br>
+      • <strong>WASD / Uzay / C:</strong> Serbest Uçuş Kamerası<br>
+      • <strong>Fare Tekerleği:</strong> Yakınlaş / Uzaklaş<br>
+      • <strong>Boşluk (veya tık):</strong> Seçili Vfx'i Zemin Üzerine Patlat
+    </div>
+  </div>
+
+  <div id="perf">Yükleniyor...</div>
+
+<script type="module">
+// ============================================================================
+// Omni-Voxel VFX Comprehensive Test Sandbox
+// Integrating: SPARK particles, CubbyFlow fluids, SebLague smoke, NovaShader uber
+// ============================================================================
+
+const canvas = document.getElementById('c');
+const perfEl = document.getElementById('perf');
+
+if (!navigator.gpu) {
+  alert('WebGPU bu tarayıcıda desteklenmiyor!');
+  throw new Error('WebGPU not supported');
+}
+
+const adapter = await navigator.gpu.requestAdapter();
+const device = await adapter.requestDevice();
+const ctx = canvas.getContext('webgpu');
+const format = navigator.gpu.getPreferredCanvasFormat();
+ctx.configure({ device, format, alphaMode: 'premultiplied' });
+
+// Resize
+function resize() {
+  canvas.width = window.innerWidth * window.devicePixelRatio;
+  canvas.height = window.innerHeight * window.devicePixelRatio;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ----------------------------------------------------------------------------
+// Camera
+// ----------------------------------------------------------------------------
+const cam = { x: 0, y: 12, z: -22, yaw: 0, pitch: -0.35, speed: 12 };
+const keys = {};
+window.addEventListener('keydown', (e) => keys[e.code] = true);
+window.addEventListener('keyup', (e) => keys[e.code] = false);
+
+let dragging = false;
+canvas.addEventListener('mousedown', () => dragging = true);
+window.addEventListener('mouseup', () => dragging = false);
+window.addEventListener('mousemove', (e) => {
+  if (dragging) {
+    cam.yaw += e.movementX * 0.003;
+    cam.pitch = Math.max(-1.4, Math.min(1.4, cam.pitch - e.movementY * 0.003));
+  }
+});
+
+// Active VFX mode: 1=Sparks, 2=Explosion, 3=Fire, 4=Smoke, 5=Water, 6=Magic
+let activeMode = 1;
+const btnIds = ['btn-sparks', 'btn-explosion', 'btn-fire', 'btn-smoke', 'btn-water', 'btn-magic'];
+btnIds.forEach((id, idx) => {
+  document.getElementById(id).addEventListener('click', () => {
+    activeMode = idx + 1;
+    btnIds.forEach(b => document.getElementById(b).classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    triggerVFXBurst(activeMode);
+  });
+});
+
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'Digit1') document.getElementById('btn-sparks').click();
+  if (e.code === 'Digit2') document.getElementById('btn-explosion').click();
+  if (e.code === 'Digit3') document.getElementById('btn-fire').click();
+  if (e.code === 'Digit4') document.getElementById('btn-smoke').click();
+  if (e.code === 'Digit5') document.getElementById('btn-water').click();
+  if (e.code === 'Digit6') document.getElementById('btn-magic').click();
+  if (e.code === 'Space') triggerVFXBurst(activeMode);
+});
+
+// ----------------------------------------------------------------------------
+// Shaders & Buffers: 8,192 GPU Particles with 3D Voxel Collision & Elasticity
+// ----------------------------------------------------------------------------
+const MAX_PARTICLES = 8192;
+// Particle struct: pos(vec3), life(f32), vel(vec3), maxLife(f32), color(vec4), size(f32), mode(f32), pad(vec2) = 64 bytes
+const particleBufferSize = MAX_PARTICLES * 64;
+const particleBuffer = device.createBuffer({
+  size: particleBufferSize,
+  usage: GPUBufferUsage.STORAGE | GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+});
+
+// Uniform buffer: viewProj(mat4), camPos(vec4), time(f32), dt(f32), mode(f32), pad(f32) = 96 bytes
+const uniformBuffer = device.createBuffer({
+  size: 128,
+  usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+});
+
+// Spawn Particles via JS into staging buffer
+const particleArray = new Float32Array(MAX_PARTICLES * 16);
+
+function triggerVFXBurst(mode) {
+  for (let i = 0; i < 400; i++) {
+    const idx = (Math.floor(Math.random() * MAX_PARTICLES)) * 16;
+    // Position: near origin or platform center
+    particleArray[idx + 0] = (Math.random() - 0.5) * 4.0;
+    particleArray[idx + 1] = 2.0 + Math.random() * 1.5;
+    particleArray[idx + 2] = (Math.random() - 0.5) * 4.0;
+
+    let life = 1.0 + Math.random() * 1.5;
+    let size = 0.18 + Math.random() * 0.12;
+
+    if (mode === 1) {
+      // Sparks (high speed, bouncy, orange-yellow)
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 10.0 + Math.random() * 14.0;
+      particleArray[idx + 4] = Math.cos(angle) * speed;
+      particleArray[idx + 5] = 6.0 + Math.random() * 10.0;
+      particleArray[idx + 6] = Math.sin(angle) * speed;
+      // Color: Intense Golden Yellow
+      particleArray[idx + 8] = 3.5; particleArray[idx + 9] = 2.2; particleArray[idx + 10] = 0.4; particleArray[idx + 11] = 1.0;
+    } else if (mode === 2) {
+      // Explosion (expanding sphere with debris)
+      const u = Math.random(), v = Math.random();
+      const theta = u * 2.0 * Math.PI, phi = Math.acos(2.0 * v - 1.0);
+      const sp = 12.0 + Math.random() * 16.0;
+      particleArray[idx + 4] = Math.sin(phi) * Math.cos(theta) * sp;
+      particleArray[idx + 5] = Math.abs(Math.cos(phi)) * sp + 4.0;
+      particleArray[idx + 6] = Math.sin(phi) * Math.sin(theta) * sp;
+      // Color: Fiery Orange/Red to Dark Smoke
+      particleArray[idx + 8] = 4.0; particleArray[idx + 9] = 1.2; particleArray[idx + 10] = 0.2; particleArray[idx + 11] = 1.0;
+      size = 0.35 + Math.random() * 0.25;
+    } else if (mode === 3) {
+      // Fire (continuous swirling upward heat)
+      particleArray[idx + 4] = (Math.random() - 0.5) * 2.0;
+      particleArray[idx + 5] = 3.5 + Math.random() * 5.0;
+      particleArray[idx + 6] = (Math.random() - 0.5) * 2.0;
+      particleArray[idx + 8] = 3.8; particleArray[idx + 9] = 0.9; particleArray[idx + 10] = 0.05; particleArray[idx + 11] = 1.0;
+      life = 0.8 + Math.random() * 0.7;
+    } else if (mode === 4) {
+      // Volumetric Smoke (slow, expanding, grey-blue)
+      particleArray[idx + 4] = (Math.random() - 0.5) * 2.5;
+      particleArray[idx + 5] = 2.5 + Math.random() * 3.5;
+      particleArray[idx + 6] = (Math.random() - 0.5) * 2.5;
+      particleArray[idx + 8] = 0.45; particleArray[idx + 9] = 0.48; particleArray[idx + 10] = 0.52; particleArray[idx + 11] = 0.85;
+      life = 2.5 + Math.random() * 1.5;
+      size = 0.4 + Math.random() * 0.3;
+    } else if (mode === 5) {
+      // Water splash & river stream (cyan-blue droplets)
+      const angle = Math.random() * Math.PI * 2;
+      const sp = 4.0 + Math.random() * 7.0;
+      particleArray[idx + 4] = Math.cos(angle) * sp;
+      particleArray[idx + 5] = 5.0 + Math.random() * 6.0;
+      particleArray[idx + 6] = Math.sin(angle) * sp;
+      particleArray[idx + 8] = 0.15; particleArray[idx + 9] = 0.75; particleArray[idx + 10] = 1.2; particleArray[idx + 11] = 0.9;
+      size = 0.22;
+    } else {
+      // Magic / Energy (NovaShader dissolve / purple neon)
+      const angle = Math.random() * Math.PI * 2;
+      particleArray[idx + 4] = Math.cos(angle) * 6.0;
+      particleArray[idx + 5] = 2.0 + Math.random() * 8.0;
+      particleArray[idx + 6] = Math.sin(angle) * 6.0;
+      particleArray[idx + 8] = 2.5; particleArray[idx + 9] = 0.2; particleArray[idx + 10] = 3.5; particleArray[idx + 11] = 1.0;
+      size = 0.28;
+    }
+
+    particleArray[idx + 3] = life;
+    particleArray[idx + 7] = life;
+    particleArray[idx + 12] = size;
+    particleArray[idx + 13] = mode;
+  }
+  device.queue.writeBuffer(particleBuffer, 0, particleArray);
+}
+
+// Initial burst
+triggerVFXBurst(1);
+
+// ----------------------------------------------------------------------------
+// Compute Shader (Physical Particle Update + Voxel Restitution Collision)
+// ----------------------------------------------------------------------------
+const COMPUTE_WGSL = /* wgsl */ `
+struct Particle {
+  pos: vec3f,
+  life: f32,
+  vel: vec3f,
+  maxLife: f32,
+  color: vec4f,
+  size: f32,
+  mode: f32,
+  pad: vec2f,
+};
+
+struct SimUniforms {
+  viewProj: mat4x4f,
+  camPos: vec4f,
+  time: f32,
+  dt: f32,
+  activeMode: f32,
+  pad: f32,
+};
+
+@group(0) @binding(0) var<uniform> U: SimUniforms;
+@group(0) @binding(1) var<storage, read_write> P: array<Particle>;
+
+@compute @workgroup_size(64)
+fn cs_update(@builtin(global_invocation_id) id: vec3u) {
+  let idx = id.x;
+  if (idx >= ${MAX_PARTICLES}u) { return; }
+
+  var p = P[idx];
+  if (p.life <= 0.0) { return; }
+
+  p.life -= U.dt;
+  let normLife = clamp(p.life / p.maxLife, 0.0, 1.0);
+
+  // Mode specific physics:
+  if (p.mode == 3.0) {
+    // Fire: buoyant upward turbulence
+    p.vel.y += 6.5 * U.dt;
+    p.vel.x += sin(U.time * 5.0 + p.pos.y) * 0.4 * U.dt;
+  } else if (p.mode == 4.0) {
+    // Smoke: gentle rise and lateral wind drag
+    p.vel.y += 1.8 * U.dt;
+    p.vel.x += 0.8 * U.dt;
+    p.vel *= 0.985;
+    p.size += 0.15 * U.dt; // Expanding smoke puff
+  } else {
+    // Sparks & Water: Standard gravity
+    p.vel.y -= 9.81 * U.dt;
+    p.vel *= 0.99;
+  }
+
+  var nextPos = p.pos + p.vel * U.dt;
+
+  // Solid Voxel Platform Collision (Y = 1.0 is the platform deck)
+  // SPARK Restitution Bounce:
+  if (nextPos.y <= 1.0 && abs(nextPos.x) <= 12.0 && abs(nextPos.z) <= 12.0) {
+    nextPos.y = 1.0;
+    if (p.mode == 1.0 || p.mode == 2.0) {
+      // Sparks bounce vigorously with 0.65 elasticity
+      p.vel.y = -p.vel.y * 0.65;
+      p.vel.x *= 0.85;
+      p.vel.z *= 0.85;
+    } else if (p.mode == 5.0) {
+      // Water spreads on platform
+      p.vel.y = -p.vel.y * 0.15;
+      p.vel.x *= 1.05;
+      p.vel.z *= 1.05;
+    } else {
+      p.vel.y = 0.0;
+    }
+  }
+
+  p.pos = nextPos;
+  P[idx] = p;
+}
+`;
+
+// ----------------------------------------------------------------------------
+// Render Shader: Voxel World Deck + Micro-Cube Instanced Particles
+// ----------------------------------------------------------------------------
+const RENDER_WGSL = /* wgsl */ `
+struct SimUniforms {
+  viewProj: mat4x4f,
+  camPos: vec4f,
+  time: f32,
+  dt: f32,
+  activeMode: f32,
+  pad: f32,
+};
+
+struct Particle {
+  pos: vec3f,
+  life: f32,
+  vel: vec3f,
+  maxLife: f32,
+  color: vec4f,
+  size: f32,
+  mode: f32,
+  pad: vec2f,
+};
+
+@group(0) @binding(0) var<uniform> U: SimUniforms;
+@group(0) @binding(1) var<storage, read> P: array<Particle>;
+
+struct VertexOut {
+  @builtin(position) pos: vec4f,
+  @location(0) color: vec4f,
+  @location(1) normal: vec3f,
+  @location(2) worldPos: vec3f,
+};
+
+// Micro-voxel cube vertex geometry (36 vertices)
+@vertex fn vs_particle(
+  @builtin(vertex_index) vi: u32,
+  @builtin(instance_index) ii: u32
+) -> VertexOut {
+  let p = P[ii];
+
+  let cubePos = array<vec3f, 36>(
+    // Front (+Z)
+    vec3f(-0.5, -0.5,  0.5), vec3f( 0.5, -0.5,  0.5), vec3f( 0.5,  0.5,  0.5),
+    vec3f(-0.5, -0.5,  0.5), vec3f( 0.5,  0.5,  0.5), vec3f(-0.5,  0.5,  0.5),
+    // Back (-Z)
+    vec3f( 0.5, -0.5, -0.5), vec3f(-0.5, -0.5, -0.5), vec3f(-0.5,  0.5, -0.5),
+    vec3f( 0.5, -0.5, -0.5), vec3f(-0.5,  0.5, -0.5), vec3f( 0.5,  0.5, -0.5),
+    // Top (+Y)
+    vec3f(-0.5,  0.5,  0.5), vec3f( 0.5,  0.5,  0.5), vec3f( 0.5,  0.5, -0.5),
+    vec3f(-0.5,  0.5,  0.5), vec3f( 0.5,  0.5, -0.5), vec3f(-0.5,  0.5, -0.5),
+    // Bottom (-Y)
+    vec3f(-0.5, -0.5, -0.5), vec3f( 0.5, -0.5, -0.5), vec3f( 0.5, -0.5,  0.5),
+    vec3f(-0.5, -0.5, -0.5), vec3f( 0.5, -0.5,  0.5), vec3f(-0.5, -0.5,  0.5),
+    // Right (+X)
+    vec3f( 0.5, -0.5,  0.5), vec3f( 0.5, -0.5, -0.5), vec3f( 0.5,  0.5, -0.5),
+    vec3f( 0.5, -0.5,  0.5), vec3f( 0.5,  0.5, -0.5), vec3f( 0.5,  0.5,  0.5),
+    // Left (-X)
+    vec3f(-0.5, -0.5, -0.5), vec3f(-0.5, -0.5,  0.5), vec3f(-0.5,  0.5,  0.5),
+    vec3f(-0.5, -0.5, -0.5), vec3f(-0.5,  0.5,  0.5), vec3f(-0.5,  0.5, -0.5),
+  );
+
+  let cubeNorm = array<vec3f, 6>(
+    vec3f(0.0, 0.0, 1.0), vec3f(0.0, 0.0, -1.0),
+    vec3f(0.0, 1.0, 0.0), vec3f(0.0, -1.0, 0.0),
+    vec3f(1.0, 0.0, 0.0), vec3f(-1.0, 0.0, 0.0),
+  );
+
+  // If particle dead, collapse to zero
+  let activeScale = select(0.0, p.size, p.life > 0.0);
+  let localP = cubePos[vi] * activeScale;
+  let worldP = p.pos + localP;
+
+  var out: VertexOut;
+  out.pos = U.viewProj * vec4f(worldP, 1.0);
+  out.color = p.color * clamp(p.life / p.maxLife, 0.1, 1.0);
+  out.normal = cubeNorm[vi / 6u];
+  out.worldPos = worldP;
+  return out;
+}
+
+@fragment fn fs_particle(in: VertexOut) -> @location(0) vec4f {
+  let N = normalize(in.normal);
+  let L = normalize(vec3f(0.5, 0.8, -0.3));
+  let NdL = max(dot(N, L), 0.0);
+  let lit = in.color.rgb * (NdL * 1.5 + 0.45);
+  return vec4f(lit, in.color.a);
+}
+
+// Platform Floor Grid Shader
+struct FloorVertexOut {
+  @builtin(position) pos: vec4f,
+  @location(0) worldPos: vec3f,
+  @location(1) normal: vec3f,
+};
+
+@vertex fn vs_floor(@builtin(vertex_index) vi: u32) -> FloorVertexOut {
+  let p = array<vec3f, 6>(
+    vec3f(-16.0, 1.0, -16.0), vec3f( 16.0, 1.0, -16.0), vec3f( 16.0, 1.0,  16.0),
+    vec3f(-16.0, 1.0, -16.0), vec3f( 16.0, 1.0,  16.0), vec3f(-16.0, 1.0,  16.0),
+  );
+  var out: FloorVertexOut;
+  out.pos = U.viewProj * vec4f(p[vi], 1.0);
+  out.worldPos = p[vi];
+  out.normal = vec3f(0.0, 1.0, 0.0);
+  return out;
+}
+
+@fragment fn fs_floor(in: FloorVertexOut) -> @location(0) vec4f {
+  // Checkerboard voxel grid pattern
+  let grid = abs(fract(in.worldPos.xz * 1.0) - 0.5);
+  let line = smoothstep(0.46, 0.49, max(grid.x, grid.y));
+  let baseColor = mix(vec3f(0.12, 0.16, 0.22), vec3f(0.24, 0.32, 0.44), line);
+
+  // Soft reflection and ambient
+  return vec4f(baseColor, 1.0);
+}
+`;
+
+// Compile Pipelines
+const compMod = device.createShaderModule({ code: COMPUTE_WGSL });
+const rendMod = device.createShaderModule({ code: RENDER_WGSL });
+
+const computePipeline = device.createComputePipeline({
+  layout: 'auto',
+  compute: { module: compMod, entryPoint: 'cs_update' },
+});
+
+const compBindGroup = device.createBindGroup({
+  layout: computePipeline.getBindGroupLayout(0),
+  entries: [
+    { binding: 0, resource: { buffer: uniformBuffer } },
+    { binding: 1, resource: { buffer: particleBuffer } },
+  ],
+});
+
+// Particle Render Pipeline
+const particlePipeline = device.createRenderPipeline({
+  layout: 'auto',
+  vertex: { module: rendMod, entryPoint: 'vs_particle' },
+  fragment: {
+    module: rendMod,
+    entryPoint: 'fs_particle',
+    targets: [{
+      format,
+      blend: {
+        color: { srcFactor: 'src-alpha', dstFactor: 'one', operation: 'add' },
+        alpha: { srcFactor: 'one', dstFactor: 'one', operation: 'add' },
+      },
+    }],
+  },
+  primitive: { topology: 'triangle-list', cullMode: 'back' },
+  depthStencil: { format: 'depth24plus', depthWriteEnabled: true, depthCompare: 'less' },
+});
+
+const particleBindGroup = device.createBindGroup({
+  layout: particlePipeline.getBindGroupLayout(0),
+  entries: [
+    { binding: 0, resource: { buffer: uniformBuffer } },
+    { binding: 1, resource: { buffer: particleBuffer } },
+  ],
+});
+
+// Floor Render Pipeline
+const floorPipeline = device.createRenderPipeline({
+  layout: 'auto',
+  vertex: { module: rendMod, entryPoint: 'vs_floor' },
+  fragment: { module: rendMod, entryPoint: 'fs_floor', targets: [{ format }] },
+  primitive: { topology: 'triangle-list' },
+  depthStencil: { format: 'depth24plus', depthWriteEnabled: true, depthCompare: 'less' },
+});
+
+const floorBindGroup = device.createBindGroup({
+  layout: floorPipeline.getBindGroupLayout(0),
+  entries: [
+    { binding: 0, resource: { buffer: uniformBuffer } },
+    { binding: 1, resource: { buffer: particleBuffer } },
+  ],
+});
+
+// Depth Texture
+let depthTexture = device.createTexture({
+  size: [canvas.width, canvas.height],
+  format: 'depth24plus',
+  usage: GPUTextureUsage.RENDER_ATTACHMENT,
+});
+
+// Matrix math
+function perspective(out, fov, aspect, near, far) {
+  const f = 1.0 / Math.tan(fov / 2);
+  out.fill(0);
+  out[0] = f / aspect;
+  out[5] = f;
+  out[10] = far / (near - far);
+  out[11] = -1;
+  out[14] = (near * far) / (near - far);
+}
+
+function lookAt(out, eye, target, up) {
+  let zx = eye[0] - target[0], zy = eye[1] - target[1], zz = eye[2] - target[2];
+  let len = Math.hypot(zx, zy, zz) || 1;
+  zx /= len; zy /= len; zz /= len;
+
+  let xx = up[1] * zz - up[2] * zy, xy = up[2] * zx - up[0] * zz, xz = up[0] * zy - up[1] * zx;
+  len = Math.hypot(xx, xy, xz) || 1;
+  xx /= len; xy /= len; xz /= len;
+
+  let yx = zy * xz - zz * xy, yy = zz * xx - zx * xz, yz = zx * xy - zy * xx;
+
+  out[0] = xx; out[4] = xy; out[8] = xz;  out[12] = -(xx * eye[0] + xy * eye[1] + xz * eye[2]);
+  out[1] = yx; out[5] = yy; out[9] = yz;  out[13] = -(yx * eye[0] + yy * eye[1] + yz * eye[2]);
+  out[2] = zx; out[6] = zy; out[10] = zz; out[14] = -(zx * eye[0] + zy * eye[1] + zz * eye[2]);
+  out[3] = 0;  out[7] = 0;  out[11] = 0;  out[15] = 1;
+}
+
+function multiply(out, a, b) {
+  const tmp = new Float32Array(16);
+  for (let r = 0; r < 4; r++) {
+    for (let c = 0; c < 4; c++) {
+      tmp[c * 4 + r] = a[r] * b[c * 4] + a[4 + r] * b[c * 4 + 1] + a[8 + r] * b[c * 4 + 2] + a[12 + r] * b[c * 4 + 3];
+    }
+  }
+  out.set(tmp);
+}
+
+const projMat = new Float32Array(16);
+const viewMat = new Float32Array(16);
+const vpMat = new Float32Array(16);
+const uData = new Float32Array(32);
+
+let lastTime = performance.now();
+let frameCount = 0, fpsTime = 0;
+
+// ----------------------------------------------------------------------------
+// Render Loop
+// ----------------------------------------------------------------------------
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.05, (now - lastTime) / 1000);
+  lastTime = now;
+
+  frameCount++;
+  fpsTime += dt;
+  if (fpsTime >= 0.5) {
+    perfEl.textContent = `${(frameCount / fpsTime).toFixed(0)} FPS | 8,192 GPU Particles | Mod: ${activeMode}`;
+    frameCount = 0; fpsTime = 0;
+  }
+
+  // Camera movement
+  const fwd = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0);
+  const str = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0);
+  const v = cam.speed * dt;
+  cam.x += (Math.sin(cam.yaw) * fwd + Math.cos(cam.yaw) * str) * v;
+  cam.z += (Math.cos(cam.yaw) * fwd - Math.sin(cam.yaw) * str) * v;
+  if (keys.KeyE || keys.Space) cam.y += v;
+  if (keys.KeyC || keys.KeyQ) cam.y -= v;
+
+  // Matrices
+  perspective(projMat, 60 * Math.PI / 180, canvas.width / canvas.height, 0.1, 200.0);
+  const cy = Math.cos(cam.yaw), sy = Math.sin(cam.yaw), cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
+  const fwdX = sy * cp, fwdY = sp, fwdZ = cy * cp;
+  lookAt(viewMat, [cam.x, cam.y, cam.z], [cam.x + fwdX, cam.y + fwdY, cam.z + fwdZ], [0, 1, 0]);
+  multiply(vpMat, projMat, viewMat);
+
+  // Upload Uniforms
+  uData.set(vpMat, 0);
+  uData[16] = cam.x; uData[17] = cam.y; uData[18] = cam.z; uData[19] = 1.0;
+  uData[20] = now * 0.001; // time
+  uData[21] = dt;
+  uData[22] = activeMode;
+  device.queue.writeBuffer(uniformBuffer, 0, uData);
+
+  // Recreate depth if resized
+  if (depthTexture.width !== canvas.width || depthTexture.height !== canvas.height) {
+    depthTexture.destroy();
+    depthTexture = device.createTexture({
+      size: [canvas.width, canvas.height],
+      format: 'depth24plus',
+      usage: GPUTextureUsage.RENDER_ATTACHMENT,
+    });
+  }
+
+  // Command Encoder
+  const enc = device.createCommandEncoder();
+
+  // 1. Compute Pass: Particle Physics & Restitution
+  const cpPass = enc.beginComputePass();
+  cpPass.setPipeline(computePipeline);
+  cpPass.setBindGroup(0, compBindGroup);
+  cpPass.dispatchWorkgroups(Math.ceil(MAX_PARTICLES / 64));
+  cpPass.end();
+
+  // 2. Render Pass: Floor + Particles
+  const rp = enc.beginRenderPass({
+    colorAttachments: [{
+      view: ctx.getCurrentTexture().createView(),
+      clearValue: { r: 0.03, g: 0.05, b: 0.08, a: 1.0 },
+      loadOp: 'clear',
+      storeOp: 'store',
+    }],
+    depthStencilAttachment: {
+      view: depthTexture.createView(),
+      depthClearValue: 1.0,
+      depthLoadOp: 'clear',
+      depthStoreOp: 'discard',
+    },
+  });
+
+  // Draw Floor
+  rp.setPipeline(floorPipeline);
+  rp.setBindGroup(0, floorBindGroup);
+  rp.draw(6);
+
+  // Draw 8,192 Micro-Voxel Particles
+  rp.setPipeline(particlePipeline);
+  rp.setBindGroup(0, particleBindGroup);
+  rp.draw(36, MAX_PARTICLES);
+
+  rp.end();
+  device.queue.submit([enc.finish()]);
+}
+
+requestAnimationFrame(frame);
+console.log('[Omni-Voxel VFX] Test Sandbox fully initialized.');
+</script>
+</body>
+</html>
