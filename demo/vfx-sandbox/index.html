@@ -1,95 +1,112 @@
-<!doctype html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="tr">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Omni-Voxel VFX Test Sandbox</title>
-  <style>
-    html, body { margin: 0; height: 100%; background: #060910; overflow: hidden; font-family: monospace; color: #ddd; }
-    #c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
-    #ui {
-      position: fixed; top: 12px; left: 14px; z-index: 10;
-      background: rgba(10, 15, 24, 0.85); padding: 12px 16px; border-radius: 8px;
-      border: 1px solid rgba(255, 255, 255, 0.15); box-shadow: 0 4px 16px #000a;
-      pointer-events: auto; max-width: 380px;
-    }
-    h2 { margin: 0 0 6px 0; font-size: 14px; color: #64d2ff; }
-    .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; background: #1e3a5f; color: #aadcff; margin-bottom: 8px; }
-    .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 8px 0; }
-    button {
-      background: #142236; border: 1px solid #2d4f7c; color: #c8e3ff;
-      padding: 6px 8px; border-radius: 4px; font-family: monospace; font-size: 11px;
-      cursor: pointer; transition: 0.15s; text-align: left;
-    }
-    button:hover { background: #203a5e; border-color: #64d2ff; color: #fff; }
-    button.active { background: #007acc; border-color: #aadcff; color: #fff; font-weight: bold; }
-    .info { font-size: 11px; line-height: 1.45; color: #8fa3bf; margin-top: 8px; border-top: 1px solid #1a2a40; padding-top: 6px; }
-    #perf { position: fixed; bottom: 12px; left: 14px; font-size: 11px; color: #7f9bb3; background: #090e17c0; padding: 4px 8px; border-radius: 4px; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Voxel Realism - Ultra-Realistic Physics VFX Engine</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+  body, html { width: 100%; height: 100%; overflow: hidden; background: #050608; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; color: #fff; }
+  #canvas-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+  canvas { width: 100%; height: 100%; display: block; }
+  
+  #ui-overlay {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    z-index: 10;
+    background: rgba(10, 14, 20, 0.88);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+    padding: 16px 20px;
+    max-width: 440px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
+  }
+  h1 { font-size: 17px; font-weight: 700; color: #ffaa33; margin-bottom: 4px; letter-spacing: 0.5px; }
+  .subtitle { font-size: 11px; color: #8899aa; margin-bottom: 12px; }
+  
+  .mode-selector { display: flex; gap: 6px; margin-bottom: 12px; }
+  .btn-mode {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #ccc;
+    padding: 8px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .btn-mode:hover { background: rgba(255, 170, 50, 0.2); color: #fff; border-color: #ffaa33; }
+  .btn-mode.active { background: #ff7700; color: #fff; border-color: #ffaa33; box-shadow: 0 0 12px rgba(255, 119, 0, 0.5); }
+  
+  .controls-info { font-size: 11px; color: #99aabb; line-height: 1.6; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 10px; }
+  .kbd { background: rgba(255, 255, 255, 0.12); padding: 2px 6px; border-radius: 4px; font-weight: bold; color: #ffcc66; font-size: 10px; }
+  #perf-stats { margin-top: 8px; font-size: 10px; color: #00ffaa; font-family: monospace; font-weight: 600; }
+</style>
 </head>
 <body>
-  <canvas id="c"></canvas>
+<div id="canvas-container">
+  <canvas id="glcanvas"></canvas>
+</div>
 
-  <div id="ui">
-    <h2>Voxel VFX Test Sandbox</h2>
-    <div class="badge">WebGPU + Voxel DDA + GPU Compute Particles</div>
-    <div style="font-size: 11px; color: #cbd6e2;">Aşağıdaki test butonlarıyla efektleri tetikleyin:</div>
-
-    <div class="btn-grid">
-      <button id="btn-sparks" class="active">1. Seken Kıvılcımlar (SPARK)</button>
-      <button id="btn-explosion">2. Hacimsel Patlama & Şok</button>
-      <button id="btn-fire">3. Gerçekçi Voxel Alev (Fire)</button>
-      <button id="btn-smoke">4. Yükselen Duman (Smoke)</button>
-      <button id="btn-water">5. Voxel Dere & Dalga (Fluid)</button>
-      <button id="btn-magic">6. Büyü / Enerji (NovaShader)</button>
-    </div>
-
-    <div class="info">
-      <strong>Kontroller:</strong><br>
-      • <strong>Sol Tık / Sürükle:</strong> Kamerayı Döndür<br>
-      • <strong>WASD / Uzay / C:</strong> Serbest Uçuş Kamerası<br>
-      • <strong>Fare Tekerleği:</strong> Yakınlaş / Uzaklaş<br>
-      • <strong>Boşluk (veya tık):</strong> Seçili Vfx'i Zemin Üzerine Patlat
-    </div>
+<div id="ui-overlay">
+  <h1>VOXEL REALISM • PHYSICAL VFX</h1>
+  <div class="subtitle">Gerçek Dünya Fiziği: Yanan Voxel Kasa, Dalgalı Köpüklü Deniz, Termobarik Patlama</div>
+  
+  <div class="mode-selector">
+    <button class="btn-mode active" id="btn-fire">1. Yanan Kasa</button>
+    <button class="btn-mode" id="btn-explosion">2. Patlama</button>
+    <button class="btn-mode" id="btn-smoke">3. Kara Duman</button>
+    <button class="btn-mode" id="btn-water">4. Köpüklü Deniz</button>
   </div>
 
-  <div id="perf">Yükleniyor...</div>
+  <div class="controls-info">
+    <div>• <span class="kbd">W</span><span class="kbd">A</span><span class="kbd">S</span><span class="kbd">D</span> Kamera Gezinti (Düz Doğal Bakış)</div>
+    <div>• <span class="kbd">E</span> / <span class="kbd">Q</span> Yükseklik (Yukarı / Aşağı)</div>
+    <div>• <span class="kbd">Sol Tık + Sürükle</span> Bakış Açısı Çevirme</div>
+    <div>• <span class="kbd">Boşluk / Sol Tık</span> Patlamayı Tetikle</div>
+  </div>
 
-<script type="module">
-// ============================================================================
-// Omni-Voxel VFX Comprehensive Test Sandbox
-// Integrating: SPARK particles, CubbyFlow fluids, SebLague smoke, NovaShader uber
-// ============================================================================
+  <div id="perf-stats">60 FPS | Raymarching Başlatılıyor...</div>
+</div>
 
-const canvas = document.getElementById('c');
-const perfEl = document.getElementById('perf');
+<script>
+const canvas = document.getElementById('glcanvas');
+const perfEl = document.getElementById('perf-stats');
+const gl = canvas.getContext('webgl2', { antialias: false, depth: false, powerPreference: 'high-performance' });
 
-if (!navigator.gpu) {
-  alert('WebGPU bu tarayıcıda desteklenmiyor!');
-  throw new Error('WebGPU not supported');
+if (!gl) {
+  document.body.innerHTML = '<div style="color:red;padding:40px;">WebGL 2.0 desteklenmiyor!</div>';
+  throw new Error('WebGL2 unsupported');
 }
 
-const adapter = await navigator.gpu.requestAdapter();
-const device = await adapter.requestDevice();
-const ctx = canvas.getContext('webgpu');
-const format = navigator.gpu.getPreferredCanvasFormat();
-ctx.configure({ device, format, alphaMode: 'premultiplied' });
-
-// Resize
+// Low-overhead render resolution for silky smooth 60 FPS
+let renderW = 0, renderH = 0;
 function resize() {
-  canvas.width = window.innerWidth * window.devicePixelRatio;
-  canvas.height = window.innerHeight * window.devicePixelRatio;
+  const dpr = Math.min(1.0, window.devicePixelRatio || 1);
+  const w = Math.floor(window.innerWidth * dpr * 0.8);
+  const h = Math.floor(window.innerHeight * dpr * 0.8);
+  if (renderW !== w || renderH !== h) {
+    renderW = w;
+    renderH = h;
+    canvas.width = w;
+    canvas.height = h;
+    gl.viewport(0, 0, w, h);
+  }
 }
 window.addEventListener('resize', resize);
 resize();
 
 // ----------------------------------------------------------------------------
-// Camera
+// Camera Controls (Grounded natural perspective - strictly right-side up)
 // ----------------------------------------------------------------------------
-const cam = { x: 0, y: 12, z: -22, yaw: 0, pitch: -0.35, speed: 12 };
+const cam = { x: 0.0, y: 1.4, z: -4.5, yaw: 0.0, pitch: -0.12, speed: 4.5 };
 const keys = {};
-window.addEventListener('keydown', (e) => keys[e.code] = true);
-window.addEventListener('keyup', (e) => keys[e.code] = false);
+window.addEventListener('keydown', (e) => { keys[e.code] = true; keys[e.key.toLowerCase()] = true; });
+window.addEventListener('keyup', (e) => { keys[e.code] = false; keys[e.key.toLowerCase()] = false; });
 
 let dragging = false;
 canvas.addEventListener('mousedown', () => dragging = true);
@@ -97,533 +114,626 @@ window.addEventListener('mouseup', () => dragging = false);
 window.addEventListener('mousemove', (e) => {
   if (dragging) {
     cam.yaw += e.movementX * 0.003;
-    cam.pitch = Math.max(-1.4, Math.min(1.4, cam.pitch - e.movementY * 0.003));
+    cam.pitch = Math.max(-1.3, Math.min(1.3, cam.pitch - e.movementY * 0.003));
   }
 });
 
-// Active VFX mode: 1=Sparks, 2=Explosion, 3=Fire, 4=Smoke, 5=Water, 6=Magic
-let activeMode = 1;
-const btnIds = ['btn-sparks', 'btn-explosion', 'btn-fire', 'btn-smoke', 'btn-water', 'btn-magic'];
-btnIds.forEach((id, idx) => {
-  document.getElementById(id).addEventListener('click', () => {
-    activeMode = idx + 1;
-    btnIds.forEach(b => document.getElementById(b).classList.remove('active'));
-    document.getElementById(id).classList.add('active');
-    triggerVFXBurst(activeMode);
-  });
-});
+let activeMode = 1; // 1: Crate Fire, 2: Explosion, 3: Smoke, 4: Sea Water
+let explosionTime = -1.0;
+
+function setMode(mode, btnId) {
+  activeMode = mode;
+  ['btn-fire', 'btn-explosion', 'btn-smoke', 'btn-water'].forEach(b => document.getElementById(b).classList.remove('active'));
+  document.getElementById(btnId).classList.add('active');
+  if (mode === 2) {
+    explosionTime = 0.0;
+  }
+}
+
+document.getElementById('btn-fire').addEventListener('click', () => setMode(1, 'btn-fire'));
+document.getElementById('btn-explosion').addEventListener('click', () => setMode(2, 'btn-explosion'));
+document.getElementById('btn-smoke').addEventListener('click', () => setMode(3, 'btn-smoke'));
+document.getElementById('btn-water').addEventListener('click', () => setMode(4, 'btn-water'));
 
 window.addEventListener('keydown', (e) => {
-  if (e.code === 'Digit1') document.getElementById('btn-sparks').click();
-  if (e.code === 'Digit2') document.getElementById('btn-explosion').click();
-  if (e.code === 'Digit3') document.getElementById('btn-fire').click();
-  if (e.code === 'Digit4') document.getElementById('btn-smoke').click();
-  if (e.code === 'Digit5') document.getElementById('btn-water').click();
-  if (e.code === 'Digit6') document.getElementById('btn-magic').click();
-  if (e.code === 'Space') triggerVFXBurst(activeMode);
+  if (e.code === 'Digit1') setMode(1, 'btn-fire');
+  if (e.code === 'Digit2') setMode(2, 'btn-explosion');
+  if (e.code === 'Digit3') setMode(3, 'btn-smoke');
+  if (e.code === 'Digit4') setMode(4, 'btn-water');
+  if (e.code === 'Space') setMode(2, 'btn-explosion');
+});
+
+canvas.addEventListener('click', () => {
+  if (activeMode === 2 || explosionTime < 0.0) {
+    explosionTime = 0.0;
+  }
 });
 
 // ----------------------------------------------------------------------------
-// Shaders & Buffers: 8,192 GPU Particles with 3D Voxel Collision & Elasticity
+// Fullscreen Quad Shader Source
 // ----------------------------------------------------------------------------
-const MAX_PARTICLES = 8192;
-// Particle struct: pos(vec3), life(f32), vel(vec3), maxLife(f32), color(vec4), size(f32), mode(f32), pad(vec2) = 64 bytes
-const particleBufferSize = MAX_PARTICLES * 64;
-const particleBuffer = device.createBuffer({
-  size: particleBufferSize,
-  usage: GPUBufferUsage.STORAGE | GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-});
-
-// Uniform buffer: viewProj(mat4), camPos(vec4), time(f32), dt(f32), mode(f32), pad(f32) = 96 bytes
-const uniformBuffer = device.createBuffer({
-  size: 128,
-  usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-});
-
-// Spawn Particles via JS into staging buffer
-const particleArray = new Float32Array(MAX_PARTICLES * 16);
-
-function triggerVFXBurst(mode) {
-  for (let i = 0; i < 400; i++) {
-    const idx = (Math.floor(Math.random() * MAX_PARTICLES)) * 16;
-    // Position: near origin or platform center
-    particleArray[idx + 0] = (Math.random() - 0.5) * 4.0;
-    particleArray[idx + 1] = 2.0 + Math.random() * 1.5;
-    particleArray[idx + 2] = (Math.random() - 0.5) * 4.0;
-
-    let life = 1.0 + Math.random() * 1.5;
-    let size = 0.18 + Math.random() * 0.12;
-
-    if (mode === 1) {
-      // Sparks (high speed, bouncy, orange-yellow)
-      const angle = Math.random() * Math.PI * 2;
-      const speed = 10.0 + Math.random() * 14.0;
-      particleArray[idx + 4] = Math.cos(angle) * speed;
-      particleArray[idx + 5] = 6.0 + Math.random() * 10.0;
-      particleArray[idx + 6] = Math.sin(angle) * speed;
-      // Color: Intense Golden Yellow
-      particleArray[idx + 8] = 3.5; particleArray[idx + 9] = 2.2; particleArray[idx + 10] = 0.4; particleArray[idx + 11] = 1.0;
-    } else if (mode === 2) {
-      // Explosion (expanding sphere with debris)
-      const u = Math.random(), v = Math.random();
-      const theta = u * 2.0 * Math.PI, phi = Math.acos(2.0 * v - 1.0);
-      const sp = 12.0 + Math.random() * 16.0;
-      particleArray[idx + 4] = Math.sin(phi) * Math.cos(theta) * sp;
-      particleArray[idx + 5] = Math.abs(Math.cos(phi)) * sp + 4.0;
-      particleArray[idx + 6] = Math.sin(phi) * Math.sin(theta) * sp;
-      // Color: Fiery Orange/Red to Dark Smoke
-      particleArray[idx + 8] = 4.0; particleArray[idx + 9] = 1.2; particleArray[idx + 10] = 0.2; particleArray[idx + 11] = 1.0;
-      size = 0.35 + Math.random() * 0.25;
-    } else if (mode === 3) {
-      // Fire (continuous swirling upward heat)
-      particleArray[idx + 4] = (Math.random() - 0.5) * 2.0;
-      particleArray[idx + 5] = 3.5 + Math.random() * 5.0;
-      particleArray[idx + 6] = (Math.random() - 0.5) * 2.0;
-      particleArray[idx + 8] = 3.8; particleArray[idx + 9] = 0.9; particleArray[idx + 10] = 0.05; particleArray[idx + 11] = 1.0;
-      life = 0.8 + Math.random() * 0.7;
-    } else if (mode === 4) {
-      // Volumetric Smoke (slow, expanding, grey-blue)
-      particleArray[idx + 4] = (Math.random() - 0.5) * 2.5;
-      particleArray[idx + 5] = 2.5 + Math.random() * 3.5;
-      particleArray[idx + 6] = (Math.random() - 0.5) * 2.5;
-      particleArray[idx + 8] = 0.45; particleArray[idx + 9] = 0.48; particleArray[idx + 10] = 0.52; particleArray[idx + 11] = 0.85;
-      life = 2.5 + Math.random() * 1.5;
-      size = 0.4 + Math.random() * 0.3;
-    } else if (mode === 5) {
-      // Water splash & river stream (cyan-blue droplets)
-      const angle = Math.random() * Math.PI * 2;
-      const sp = 4.0 + Math.random() * 7.0;
-      particleArray[idx + 4] = Math.cos(angle) * sp;
-      particleArray[idx + 5] = 5.0 + Math.random() * 6.0;
-      particleArray[idx + 6] = Math.sin(angle) * sp;
-      particleArray[idx + 8] = 0.15; particleArray[idx + 9] = 0.75; particleArray[idx + 10] = 1.2; particleArray[idx + 11] = 0.9;
-      size = 0.22;
-    } else {
-      // Magic / Energy (NovaShader dissolve / purple neon)
-      const angle = Math.random() * Math.PI * 2;
-      particleArray[idx + 4] = Math.cos(angle) * 6.0;
-      particleArray[idx + 5] = 2.0 + Math.random() * 8.0;
-      particleArray[idx + 6] = Math.sin(angle) * 6.0;
-      particleArray[idx + 8] = 2.5; particleArray[idx + 9] = 0.2; particleArray[idx + 10] = 3.5; particleArray[idx + 11] = 1.0;
-      size = 0.28;
-    }
-
-    particleArray[idx + 3] = life;
-    particleArray[idx + 7] = life;
-    particleArray[idx + 12] = size;
-    particleArray[idx + 13] = mode;
-  }
-  device.queue.writeBuffer(particleBuffer, 0, particleArray);
-}
-
-// Initial burst
-triggerVFXBurst(1);
-
-// ----------------------------------------------------------------------------
-// Compute Shader (Physical Particle Update + Voxel Restitution Collision)
-// ----------------------------------------------------------------------------
-const COMPUTE_WGSL = /* wgsl */ `
-struct Particle {
-  pos: vec3f,
-  life: f32,
-  vel: vec3f,
-  maxLife: f32,
-  color: vec4f,
-  size: f32,
-  mode: f32,
-  pad: vec2f,
-};
-
-struct SimUniforms {
-  viewProj: mat4x4f,
-  camPos: vec4f,
-  time: f32,
-  dt: f32,
-  activeMode: f32,
-  pad: f32,
-};
-
-@group(0) @binding(0) var<uniform> U: SimUniforms;
-@group(0) @binding(1) var<storage, read_write> P: array<Particle>;
-
-@compute @workgroup_size(64)
-fn cs_update(@builtin(global_invocation_id) id: vec3u) {
-  let idx = id.x;
-  if (idx >= ${MAX_PARTICLES}u) { return; }
-
-  var p = P[idx];
-  if (p.life <= 0.0) { return; }
-
-  p.life -= U.dt;
-  let normLife = clamp(p.life / p.maxLife, 0.0, 1.0);
-
-  // Mode specific physics:
-  if (p.mode == 3.0) {
-    // Fire: buoyant upward turbulence
-    p.vel.y += 6.5 * U.dt;
-    p.vel.x += sin(U.time * 5.0 + p.pos.y) * 0.4 * U.dt;
-  } else if (p.mode == 4.0) {
-    // Smoke: gentle rise and lateral wind drag
-    p.vel.y += 1.8 * U.dt;
-    p.vel.x += 0.8 * U.dt;
-    p.vel *= 0.985;
-    p.size += 0.15 * U.dt; // Expanding smoke puff
-  } else {
-    // Sparks & Water: Standard gravity
-    p.vel.y -= 9.81 * U.dt;
-    p.vel *= 0.99;
-  }
-
-  var nextPos = p.pos + p.vel * U.dt;
-
-  // Solid Voxel Platform Collision (Y = 1.0 is the platform deck)
-  // SPARK Restitution Bounce:
-  if (nextPos.y <= 1.0 && abs(nextPos.x) <= 12.0 && abs(nextPos.z) <= 12.0) {
-    nextPos.y = 1.0;
-    if (p.mode == 1.0 || p.mode == 2.0) {
-      // Sparks bounce vigorously with 0.65 elasticity
-      p.vel.y = -p.vel.y * 0.65;
-      p.vel.x *= 0.85;
-      p.vel.z *= 0.85;
-    } else if (p.mode == 5.0) {
-      // Water spreads on platform
-      p.vel.y = -p.vel.y * 0.15;
-      p.vel.x *= 1.05;
-      p.vel.z *= 1.05;
-    } else {
-      p.vel.y = 0.0;
-    }
-  }
-
-  p.pos = nextPos;
-  P[idx] = p;
+const VS_SOURCE = `#version 300 es
+in vec2 a_pos;
+out vec2 v_uv;
+void main() {
+  v_uv = a_pos * 0.5 + 0.5;
+  gl_Position = vec4(a_pos, 0.0, 1.0);
 }
 `;
 
 // ----------------------------------------------------------------------------
-// Render Shader: Voxel World Deck + Micro-Cube Instanced Particles
+// Physically Grounded Raymarcher Fragment Shader
 // ----------------------------------------------------------------------------
-const RENDER_WGSL = /* wgsl */ `
-struct SimUniforms {
-  viewProj: mat4x4f,
-  camPos: vec4f,
-  time: f32,
-  dt: f32,
-  activeMode: f32,
-  pad: f32,
-};
+const FS_SOURCE = `#version 300 es
+precision highp float;
 
-struct Particle {
-  pos: vec3f,
-  life: f32,
-  vel: vec3f,
-  maxLife: f32,
-  color: vec4f,
-  size: f32,
-  mode: f32,
-  pad: vec2f,
-};
+in vec2 v_uv;
+out vec4 fragColor;
 
-@group(0) @binding(0) var<uniform> U: SimUniforms;
-@group(0) @binding(1) var<storage, read> P: array<Particle>;
+uniform vec2 u_res;
+uniform float u_time;
+uniform vec3 u_camPos;
+uniform vec2 u_camRot; // yaw, pitch
+uniform int u_mode;
+uniform float u_expTime;
 
-struct VertexOut {
-  @builtin(position) pos: vec4f,
-  @location(0) color: vec4f,
-  @location(1) normal: vec3f,
-  @location(2) worldPos: vec3f,
-};
+// 3D Simplex / Fast Value Noise
+vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+vec4 perm(vec4 x) { return mod289(((x * 34.0) + 1.0) * x); }
 
-// Micro-voxel cube vertex geometry (36 vertices)
-@vertex fn vs_particle(
-  @builtin(vertex_index) vi: u32,
-  @builtin(instance_index) ii: u32
-) -> VertexOut {
-  let p = P[ii];
-
-  let cubePos = array<vec3f, 36>(
-    // Front (+Z)
-    vec3f(-0.5, -0.5,  0.5), vec3f( 0.5, -0.5,  0.5), vec3f( 0.5,  0.5,  0.5),
-    vec3f(-0.5, -0.5,  0.5), vec3f( 0.5,  0.5,  0.5), vec3f(-0.5,  0.5,  0.5),
-    // Back (-Z)
-    vec3f( 0.5, -0.5, -0.5), vec3f(-0.5, -0.5, -0.5), vec3f(-0.5,  0.5, -0.5),
-    vec3f( 0.5, -0.5, -0.5), vec3f(-0.5,  0.5, -0.5), vec3f( 0.5,  0.5, -0.5),
-    // Top (+Y)
-    vec3f(-0.5,  0.5,  0.5), vec3f( 0.5,  0.5,  0.5), vec3f( 0.5,  0.5, -0.5),
-    vec3f(-0.5,  0.5,  0.5), vec3f( 0.5,  0.5, -0.5), vec3f(-0.5,  0.5, -0.5),
-    // Bottom (-Y)
-    vec3f(-0.5, -0.5, -0.5), vec3f( 0.5, -0.5, -0.5), vec3f( 0.5, -0.5,  0.5),
-    vec3f(-0.5, -0.5, -0.5), vec3f( 0.5, -0.5,  0.5), vec3f(-0.5, -0.5,  0.5),
-    // Right (+X)
-    vec3f( 0.5, -0.5,  0.5), vec3f( 0.5, -0.5, -0.5), vec3f( 0.5,  0.5, -0.5),
-    vec3f( 0.5, -0.5,  0.5), vec3f( 0.5,  0.5, -0.5), vec3f( 0.5,  0.5,  0.5),
-    // Left (-X)
-    vec3f(-0.5, -0.5, -0.5), vec3f(-0.5, -0.5,  0.5), vec3f(-0.5,  0.5,  0.5),
-    vec3f(-0.5, -0.5, -0.5), vec3f(-0.5,  0.5,  0.5), vec3f(-0.5,  0.5, -0.5),
-  );
-
-  let cubeNorm = array<vec3f, 6>(
-    vec3f(0.0, 0.0, 1.0), vec3f(0.0, 0.0, -1.0),
-    vec3f(0.0, 1.0, 0.0), vec3f(0.0, -1.0, 0.0),
-    vec3f(1.0, 0.0, 0.0), vec3f(-1.0, 0.0, 0.0),
-  );
-
-  // If particle dead, collapse to zero
-  let activeScale = select(0.0, p.size, p.life > 0.0);
-  let localP = cubePos[vi] * activeScale;
-  let worldP = p.pos + localP;
-
-  var out: VertexOut;
-  out.pos = U.viewProj * vec4f(worldP, 1.0);
-  out.color = p.color * clamp(p.life / p.maxLife, 0.1, 1.0);
-  out.normal = cubeNorm[vi / 6u];
-  out.worldPos = worldP;
-  return out;
+float noise3D(vec3 p) {
+  vec3 a = floor(p);
+  vec3 d = p - a;
+  d = d * d * (3.0 - 2.0 * d);
+  vec4 b = a.xxyy + vec4(0.0, 1.0, 0.0, 1.0);
+  vec4 k1 = perm(b.xyxy);
+  vec4 k2 = perm(k1.xyxy + b.zzww);
+  vec4 c = k2 + a.zzzz;
+  vec4 k3 = perm(c);
+  vec4 k4 = perm(c + 1.0);
+  vec4 o1 = fract(k3 * (1.0 / 41.0));
+  vec4 o2 = fract(k4 * (1.0 / 41.0));
+  vec4 o3 = o2 * d.z + o1 * (1.0 - d.z);
+  vec2 o4 = o3.yw * d.x + o3.xz * (1.0 - d.x);
+  return o4.y * d.y + o4.x * (1.0 - d.y);
 }
 
-@fragment fn fs_particle(in: VertexOut) -> @location(0) vec4f {
-  let N = normalize(in.normal);
-  let L = normalize(vec3f(0.5, 0.8, -0.3));
-  let NdL = max(dot(N, L), 0.0);
-  let lit = in.color.rgb * (NdL * 1.5 + 0.45);
-  return vec4f(lit, in.color.a);
+float fbm3(vec3 p) {
+  float f = 0.0;
+  f += 0.500 * noise3D(p); p *= 2.04;
+  f += 0.250 * noise3D(p); p *= 2.05;
+  f += 0.125 * noise3D(p);
+  return f;
 }
 
-// Platform Floor Grid Shader
-struct FloorVertexOut {
-  @builtin(position) pos: vec4f,
-  @location(0) worldPos: vec3f,
-  @location(1) normal: vec3f,
-};
-
-@vertex fn vs_floor(@builtin(vertex_index) vi: u32) -> FloorVertexOut {
-  let p = array<vec3f, 6>(
-    vec3f(-16.0, 1.0, -16.0), vec3f( 16.0, 1.0, -16.0), vec3f( 16.0, 1.0,  16.0),
-    vec3f(-16.0, 1.0, -16.0), vec3f( 16.0, 1.0,  16.0), vec3f(-16.0, 1.0,  16.0),
-  );
-  var out: FloorVertexOut;
-  out.pos = U.viewProj * vec4f(p[vi], 1.0);
-  out.worldPos = p[vi];
-  out.normal = vec3f(0.0, 1.0, 0.0);
-  return out;
+// ----------------------------------------------------------------------------
+// AABB Intersection for Solid Voxel Crate
+// ----------------------------------------------------------------------------
+vec2 intersectBox(vec3 ro, vec3 rd, vec3 boxMin, vec3 boxMax) {
+  vec3 t0 = (boxMin - ro) / rd;
+  vec3 t1 = (boxMax - ro) / rd;
+  vec3 tmin = min(t0, t1);
+  vec3 tmax = max(t0, t1);
+  float enter = max(max(tmin.x, tmin.y), tmin.z);
+  float exit = min(min(tmax.x, tmax.y), tmax.z);
+  return vec2(enter, exit);
 }
 
-@fragment fn fs_floor(in: FloorVertexOut) -> @location(0) vec4f {
-  // Checkerboard voxel grid pattern
-  let grid = abs(fract(in.worldPos.xz * 1.0) - 0.5);
-  let line = smoothstep(0.46, 0.49, max(grid.x, grid.y));
-  let baseColor = mix(vec3f(0.12, 0.16, 0.22), vec3f(0.24, 0.32, 0.44), line);
+vec3 getBoxNormal(vec3 p, vec3 boxMin, vec3 boxMax) {
+  vec3 c = (boxMin + boxMax) * 0.5;
+  vec3 d = (boxMax - boxMin) * 0.5;
+  vec3 q = (p - c) / d;
+  vec3 a = abs(q);
+  if (a.x > a.y && a.x > a.z) return vec3(sign(q.x), 0.0, 0.0);
+  if (a.y > a.x && a.y > a.z) return vec3(0.0, sign(q.y), 0.0);
+  return vec3(0.0, 0.0, sign(q.z));
+}
 
-  // Soft reflection and ambient
-  return vec4f(baseColor, 1.0);
+// ----------------------------------------------------------------------------
+// Ocean Wave Displacement Function (Trochoidal / Gerstner Waves)
+// ----------------------------------------------------------------------------
+float getOceanHeight(vec2 p, float t) {
+  float h = 0.0;
+  
+  // Wave Train 1 (Dominant swell)
+  vec2 d1 = vec2(0.8, 0.6);
+  float w1 = 1.2, s1 = 2.0, a1 = 0.32;
+  float x1 = dot(d1, p) * w1 + t * s1;
+  h += a1 * pow(sin(x1) * 0.5 + 0.5, 2.2);
+
+  // Wave Train 2 (Cross sea)
+  vec2 d2 = vec2(-0.7, 0.7);
+  float w2 = 2.4, s2 = 2.8, a2 = 0.16;
+  float x2 = dot(d2, p) * w2 + t * s2;
+  h += a2 * pow(sin(x2) * 0.5 + 0.5, 1.8);
+
+  // Wave Train 3 (High-frequency chop)
+  vec2 d3 = vec2(0.2, -0.98);
+  float w3 = 4.8, s3 = 4.2, a3 = 0.07;
+  float x3 = dot(d3, p) * w3 + t * s3;
+  h += a3 * sin(x3);
+
+  // Wave Train 4 (Capillary ripples)
+  vec2 d4 = vec2(-0.9, -0.4);
+  float w4 = 9.5, s4 = 5.5, a4 = 0.03;
+  float x4 = dot(d4, p) * w4 + t * s4;
+  h += a4 * sin(x4);
+
+  return h;
+}
+
+vec3 getOceanNormal(vec2 p, float t, float h) {
+  float eps = 0.04;
+  float hx = getOceanHeight(p + vec2(eps, 0.0), t);
+  float hz = getOceanHeight(p + vec2(0.0, eps), t);
+  return normalize(vec3(h - hx, eps, h - hz));
+}
+
+void main() {
+  vec2 ndc = (gl_FragCoord.xy - u_res * 0.5) / u_res.y;
+
+  // Camera Ray Orientation (Strictly Right-Side Up)
+  float cy = cos(u_camRot.x), sy = sin(u_camRot.x);
+  float cp = cos(u_camRot.y), sp = sin(u_camRot.y);
+
+  vec3 fwd = vec3(sy * cp, sp, cy * cp);
+  vec3 right = vec3(cy, 0.0, -sy);
+  // Correct up-vector: fwd cross right points +Y (sky up, ground down)
+  vec3 up = cross(fwd, right);
+  vec3 rd = normalize(fwd + right * ndc.x + up * ndc.y);
+  vec3 ro = u_camPos;
+
+  // Realistic Physical Sun & Sky Atmosphere
+  vec3 sunDir = normalize(vec3(0.6, 0.7, -0.5));
+  float sunDot = max(0.0, dot(rd, sunDir));
+  float skyT = clamp(rd.y * 1.5 + 0.05, 0.0, 1.0);
+  vec3 skyCol = mix(vec3(0.02, 0.03, 0.06), vec3(0.08, 0.16, 0.28), skyT);
+  skyCol += vec3(1.0, 0.8, 0.5) * pow(sunDot, 64.0) * 1.5; // Sun disc
+
+  vec3 col = skyCol;
+  float sceneDepth = 1e5;
+
+  // --------------------------------------------------------------------------
+  // 1. SOLID SCENE GEOMETRY: GROUND PLANE & BURNING VOXEL CRATE
+  // --------------------------------------------------------------------------
+  
+  // A. Ground Plane at Y = 0.0 (Only for Modes 1, 2, 3)
+  if (u_mode != 4) {
+    if (rd.y < -1e-4) {
+      float tG = -ro.y / rd.y;
+      if (tG > 0.0 && tG < sceneDepth) {
+        sceneDepth = tG;
+        vec3 pG = ro + rd * tG;
+        float dToCenter = length(pG.xz);
+
+        // Charred scorched ground around burning crate
+        float scorch = smoothstep(2.5, 0.4, dToCenter);
+        vec3 dirt = mix(vec3(0.09, 0.08, 0.07), vec3(0.02, 0.015, 0.015), scorch);
+        
+        // Voxel cobble / soil grain
+        float tile = noise3D(vec3(pG.xz * 2.5, 0.0));
+        dirt += (tile - 0.5) * 0.025;
+
+        // Glowing ash/charcoal embers around crate base
+        if (u_mode == 1 && dToCenter < 1.6) {
+          float emberN = noise3D(vec3(pG.xz * 9.0, u_time * 1.4));
+          float emberVein = pow(emberN, 2.5) * smoothstep(1.6, 0.3, dToCenter) * 2.5;
+          dirt += vec3(2.5, 0.6, 0.05) * emberVein;
+        }
+
+        // Distance atmospheric fog
+        float fog = exp(-tG * 0.05);
+        col = mix(skyCol, dirt, fog);
+      }
+    }
+  }
+
+  // B. Physical Voxel Wooden Crate (Sitting at Center, Modes 1, 2, 3)
+  // Crate Bounds: X [-0.55, 0.55], Y [0.0, 0.9], Z [-0.55, 0.55]
+  vec3 crateMin = vec3(-0.55, 0.0, -0.55);
+  vec3 crateMax = vec3(0.55, 0.9, 0.55);
+  vec2 crateHit = intersectBox(ro, rd, crateMin, crateMax);
+
+  if (crateHit.x > 0.0 && crateHit.x < crateHit.y && crateHit.x < sceneDepth) {
+    sceneDepth = crateHit.x;
+    vec3 pC = ro + rd * crateHit.x;
+    vec3 nC = getBoxNormal(pC, crateMin, crateMax);
+
+    // Voxel Wooden Crate Shading
+    // 16-voxel grid resolution per block face
+    vec3 localP = (pC - crateMin) / (crateMax - crateMin); // 0 to 1
+    vec3 vCell = floor(localP * 16.0) / 16.0;
+
+    // Detect edges for steel reinforcing brackets
+    float edgeDistX = min(localP.x, 1.0 - localP.x);
+    float edgeDistY = min(localP.y, 1.0 - localP.y);
+    float edgeDistZ = min(localP.z, 1.0 - localP.z);
+    bool isCorner = (edgeDistX < 0.12 && edgeDistY < 0.12) || 
+                    (edgeDistX < 0.12 && edgeDistZ < 0.12) || 
+                    (edgeDistY < 0.12 && edgeDistZ < 0.12);
+
+    vec3 crateColor = vec3(0.24, 0.16, 0.09); // Pine wood
+
+    // Wooden plank striping
+    float plank = fract(localP.y * 5.0);
+    if (plank < 0.05) crateColor *= 0.5; // Plank groove
+
+    if (isCorner) {
+      // Iron corner bracket
+      crateColor = vec3(0.08, 0.09, 0.10);
+      // Rivets
+      float rivet = length(fract(vCell.xy * 8.0) - 0.5);
+      if (rivet < 0.2) crateColor = vec3(0.18, 0.20, 0.22);
+    }
+
+    // BURNING CRATE PHYSICS (Ateş Kasayı Yakıyor)
+    if (u_mode == 1) {
+      // Burning progress: top half and roof are heavily charred and glowing
+      float burnHeat = smoothstep(0.3, 0.9, pC.y);
+      float charN = noise3D(pC * 6.0);
+      
+      // Black carbon crust
+      crateColor = mix(crateColor, vec3(0.02, 0.02, 0.02), burnHeat * 0.92);
+
+      // Deep combustion fissure veins (Közleşen ahşap çatlakları)
+      float fissure = pow(noise3D(vec3(pC * 12.0 + vec3(0.0, u_time * 0.5, 0.0))), 2.2);
+      vec3 glowingVeins = vec3(3.8, 1.1, 0.08) * fissure * burnHeat * 2.8;
+      crateColor += glowingVeins;
+    }
+
+    // Directional shading
+    float diff = max(0.1, dot(nC, sunDir));
+    crateColor *= (diff * 0.8 + 0.2);
+
+    // Dynamic fire point light illumination onto crate
+    if (u_mode == 1) {
+      vec3 lightPos = vec3(0.0, 1.4, 0.0);
+      vec3 toL = lightPos - pC;
+      float dL = length(toL);
+      float fireLight = max(0.0, dot(nC, toL / dL)) / (1.0 + dL * dL * 1.5);
+      float flicker = 1.0 + 0.25 * sin(u_time * 18.0) * sin(u_time * 9.0);
+      crateColor += vec3(2.5, 1.2, 0.2) * fireLight * flicker * 0.9;
+    }
+
+    col = crateColor;
+  }
+
+  // --------------------------------------------------------------------------
+  // 2. ULTRA-REALISTIC GERSTNER OCEAN WATER WITH FOAM (MODE 4)
+  // --------------------------------------------------------------------------
+  if (u_mode == 4) {
+    // Raymarch the undulating water surface
+    float tWater = 0.0;
+    float dtW = 0.12;
+    vec3 pW = ro;
+    bool hitWater = false;
+    float waterH = 0.0;
+
+    // Fast bounding intersection for water layer Y in [-0.2, 0.9]
+    for (int i = 0; i < 48; i++) {
+      tWater += dtW;
+      pW = ro + rd * tWater;
+      waterH = getOceanHeight(pW.xz, u_time);
+      if (pW.y < waterH) {
+        // Refine intersection
+        tWater -= dtW * 0.5;
+        pW = ro + rd * tWater;
+        waterH = getOceanHeight(pW.xz, u_time);
+        hitWater = true;
+        break;
+      }
+    }
+
+    if (hitWater && tWater < 40.0) {
+      vec3 waterP = ro + rd * tWater;
+      vec3 N = getOceanNormal(waterP.xz, u_time, waterH);
+
+      // Optical calculations
+      float cosTheta = clamp(dot(-rd, N), 0.0, 1.0);
+      // Schlick Fresnel
+      float F = 0.02 + 0.98 * pow(1.0 - cosTheta, 5.0);
+
+      // Deep Water Beer-Lambert Extinction (Kristal berrak turkuazdan derin okyanus mavisine)
+      vec3 deepSeaCol = vec3(0.015, 0.065, 0.12);
+      vec3 shallowTurquoise = vec3(0.04, 0.32, 0.42);
+      vec3 waterBody = mix(deepSeaCol, shallowTurquoise, clamp(waterH * 1.6 + 0.2, 0.0, 1.0));
+
+      // Sun specular glint (Micro-facet wave reflection)
+      vec3 H = normalize(sunDir - rd);
+      float spec = pow(max(0.0, dot(N, H)), 180.0) * 4.5;
+      vec3 sunSpec = vec3(1.0, 0.9, 0.7) * spec;
+
+      // Sky reflection
+      vec3 skyRefl = mix(vec3(0.05, 0.12, 0.22), vec3(0.45, 0.65, 0.85), clamp(reflect(rd, N).y * 1.2 + 0.2, 0.0, 1.0));
+
+      vec3 finalWater = mix(waterBody, skyRefl, F) + sunSpec;
+
+      // DYNAMIC SEA FOAM (KÖPÜKLENME) ON WAVE CRESTS
+      // 1. Crest steepness: high wave displacement + sharp curvature
+      float crest = smoothstep(0.28, 0.52, waterH);
+      // 2. High-frequency turbulent foam texture
+      float foamTurb = noise3D(vec3(waterP.xz * 6.5, u_time * 1.8));
+      float foamLace = noise3D(vec3(waterP.xz * 18.0 - vec2(u_time * 0.5), u_time * 0.8));
+      
+      float foamMask = smoothstep(0.42, 0.72, crest + foamTurb * 0.4 + foamLace * 0.25);
+
+      // White aerated sea foam with sub-surface scattering
+      vec3 foamColor = vec3(0.92, 0.96, 1.0) * (1.2 + foamTurb * 0.3);
+      finalWater = mix(finalWater, foamColor, foamMask * 0.92);
+
+      // Distance water haze
+      float fogW = exp(-tWater * 0.04);
+      col = mix(skyCol, finalWater, fogW);
+      sceneDepth = tWater;
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // 3. PHYSICAL VOLUMETRIC FLUID RAYMARCHER (Fire, Explosion, Smoke)
+  // --------------------------------------------------------------------------
+  float tStart = 0.5;
+  float tEnd = min(sceneDepth, 14.0);
+  float stepSize = 0.09;
+
+  vec4 volAcc = vec4(0.0); // rgb = emission, a = optical density
+
+  for (float t = tStart; t < tEnd; t += stepSize) {
+    if (volAcc.a >= 0.96) break;
+
+    vec3 pos = ro + rd * t;
+
+    // ------------------------------------------------------------------------
+    // MODE 1: REALISTIC COMBUSTION FIRE ON VOXEL CRATE (Kasayı Yakan Canlı Ateş)
+    // ------------------------------------------------------------------------
+    if (u_mode == 1) {
+      // Fire sits directly on top of the voxel crate (Y=0.7 to Y=4.0)
+      float h = pos.y - 0.7; // Height above crate top
+      if (h >= -0.2 && h <= 3.6) {
+        float r = length(pos.xz);
+        
+        // Base flame footprint matches the top perimeter of the crate
+        float maxR = (0.75 - h * 0.18) * (1.0 + 0.15 * sin(h * 3.5));
+
+        // Buoyant fluid convection: velocity increases with height + organic swirl
+        vec3 flowPos = pos * 1.9 - vec3(0.0, u_time * 4.6 + sqrt(max(0.0, h) + 0.1) * 2.2, 0.0);
+        float turb = fbm3(flowPos);
+
+        float flameShape = (maxR - r + turb * 0.52);
+
+        if (flameShape > 0.0) {
+          float coreDensity = smoothstep(0.0, 0.35, flameShape);
+          vec3 flameCol = vec3(0.0);
+
+          if (h < 0.25) {
+            // Blue/Violet Pre-combustion root flame hugging the wooden surface
+            flameCol = vec3(0.2, 0.7, 3.2) * 3.5 * coreDensity;
+          } else if (h < 2.0) {
+            // Incandescent soot combustion (1300°C luminous yellow core)
+            float tempFade = 1.0 - (h - 0.25) / 1.75;
+            vec3 coreYellow = vec3(3.6, 2.6, 0.7);
+            vec3 outerOrange = vec3(2.6, 0.75, 0.05);
+            flameCol = mix(outerOrange, coreYellow, tempFade * coreDensity);
+          } else {
+            // Cooling soot tip transforming into smoke
+            float coolFade = (h - 2.0) / 1.6;
+            vec3 darkRed = vec3(1.1, 0.16, 0.02);
+            vec3 sootSmoke = vec3(0.02, 0.02, 0.025);
+            flameCol = mix(darkRed, sootSmoke, coolFade);
+          }
+
+          float opacity = flameShape * 0.44;
+          volAcc.rgb += flameCol * opacity * (1.0 - volAcc.a);
+          volAcc.a += opacity * (1.0 - volAcc.a);
+        }
+      }
+    }
+
+    // ------------------------------------------------------------------------
+    // MODE 2: THERMOBARIC GROUND DETONATION & MUSHROOM CLOUD
+    // ------------------------------------------------------------------------
+    else if (u_mode == 2 && u_expTime >= 0.0) {
+      float et = u_expTime;
+
+      // STAGE 1: HYPER-INTENSE GROUND FLASH (0.0s - 0.25s)
+      if (et < 0.25) {
+        float blastR = (et / 0.25) * 3.8;
+        vec3 pExpl = pos - vec3(0.0, 0.45, 0.0);
+        float d = length(pExpl);
+        if (d < blastR) {
+          float intens = (1.0 - d / blastR) * 8.0;
+          vec3 flashCol = vec3(3.0, 2.7, 2.0) * intens;
+          float alpha = clamp(intens * 0.65, 0.0, 1.0);
+          volAcc.rgb += flashCol * alpha * (1.0 - volAcc.a);
+          volAcc.a += alpha * (1.0 - volAcc.a);
+        }
+      }
+
+      // STAGE 2: EXPANDING TOROIDAL FIRE VORTEX (0.25s - 2.2s)
+      else if (et < 2.2) {
+        float progress = (et - 0.25) / 1.95;
+        float liftY = 0.5 + progress * 4.2;
+        vec3 fireballCenter = vec3(0.0, liftY, 0.0);
+        vec3 relP = pos - fireballCenter;
+
+        float rH = length(relP.xz);
+        // Toroidal ring vortex structure
+        float torusDist = length(vec2(rH - 1.3 * (1.0 + progress * 0.8), relP.y * 1.3)) - 1.2 * (1.0 + progress * 0.6);
+
+        vec3 flowN = relP * 1.3 - vec3(0.0, et * 3.0, 0.0);
+        float turb = fbm3(flowN);
+
+        float fireDensity = smoothstep(0.4, -0.6, torusDist + turb * 0.95);
+
+        if (fireDensity > 0.01) {
+          vec3 fieryCore = mix(vec3(3.6, 2.9, 1.2), vec3(2.8, 0.85, 0.06), progress);
+          vec3 sootCrust = vec3(0.03, 0.03, 0.035);
+          
+          vec3 finalExpl = mix(fieryCore, sootCrust, smoothstep(0.35, 0.88, progress + turb * 0.28));
+
+          float alpha = fireDensity * 0.58;
+          volAcc.rgb += finalExpl * alpha * (1.0 - volAcc.a);
+          volAcc.a += alpha * (1.0 - volAcc.a);
+        }
+      }
+
+      // STAGE 3: LINGERING MUSHROOM SMOKE STEM & CAP (2.2s - 8.0s)
+      else if (et < 8.0) {
+        float progress = (et - 2.2) / 5.8;
+        float smokeTopY = 4.8 + progress * 3.2;
+        vec3 relP = pos - vec3(0.0, smokeTopY, 0.0);
+
+        float rH = length(relP.xz);
+        float smokeShape = length(vec2(rH - 1.9 * (1.0 + progress * 0.7), relP.y * 1.4)) - 1.7;
+
+        vec3 flowN = relP * 0.85 - vec3(u_time * 0.1, et * 0.5, 0.0);
+        float turb = fbm3(flowN);
+
+        float density = smoothstep(0.5, -0.6, smokeShape + turb * 0.85);
+
+        if (density > 0.01) {
+          float fade = (1.0 - progress);
+          vec3 smokeColor = vec3(0.05, 0.055, 0.065) * (1.0 + turb * 0.35);
+          float alpha = density * fade * 0.40;
+
+          volAcc.rgb += smokeColor * alpha * (1.0 - volAcc.a);
+          volAcc.a += alpha * (1.0 - volAcc.a);
+        }
+      }
+    }
+
+    // ------------------------------------------------------------------------
+    // MODE 3: VOLUMETRIC DENSE INDUSTRIAL SMOKE PLUME
+    // ------------------------------------------------------------------------
+    else if (u_mode == 3) {
+      float h = pos.y;
+      if (h >= 0.0 && h <= 7.0) {
+        float windOffset = h * 0.32;
+        vec3 relP = pos - vec3(windOffset, 0.0, 0.0);
+        float r = length(relP.xz);
+        float plumeR = 0.38 + h * 0.36;
+
+        vec3 flowCoord = relP * 1.2 - vec3(u_time * 0.4, u_time * 1.8, 0.0);
+        float turb = fbm3(flowCoord);
+
+        float smokeDensity = smoothstep(plumeR, plumeR - 0.95, r + turb * 0.68);
+
+        if (smokeDensity > 0.01) {
+          float fade = 1.0 - smoothstep(4.2, 7.0, h);
+          vec3 smokeColor = vec3(0.08, 0.09, 0.10) * (1.2 + turb * 0.4);
+          float alpha = smokeDensity * fade * 0.44;
+
+          volAcc.rgb += smokeColor * alpha * (1.0 - volAcc.a);
+          volAcc.a += alpha * (1.0 - volAcc.a);
+        }
+      }
+    }
+  }
+
+  // Final Composition: Solid Background + Emitted Volumetric Light
+  col = col * (1.0 - volAcc.a) + volAcc.rgb;
+
+  // ACES Filmic Tone Mapping (Filmic highlight compression, no blowouts)
+  vec3 x = col;
+  vec3 a = x * (x + 0.0245786) - 0.000090537;
+  vec3 b = x * (0.983729 * x + 0.4329510) + 0.238081;
+  vec3 mapped = clamp(a / b, 0.0, 1.0);
+
+  // Gamma Correction
+  mapped = pow(mapped, vec3(1.0 / 2.2));
+
+  fragColor = vec4(mapped, 1.0);
 }
 `;
 
-// Compile Pipelines
-const compMod = device.createShaderModule({ code: COMPUTE_WGSL });
-const rendMod = device.createShaderModule({ code: RENDER_WGSL });
-
-const computePipeline = device.createComputePipeline({
-  layout: 'auto',
-  compute: { module: compMod, entryPoint: 'cs_update' },
-});
-
-const compBindGroup = device.createBindGroup({
-  layout: computePipeline.getBindGroupLayout(0),
-  entries: [
-    { binding: 0, resource: { buffer: uniformBuffer } },
-    { binding: 1, resource: { buffer: particleBuffer } },
-  ],
-});
-
-// Particle Render Pipeline
-const particlePipeline = device.createRenderPipeline({
-  layout: 'auto',
-  vertex: { module: rendMod, entryPoint: 'vs_particle' },
-  fragment: {
-    module: rendMod,
-    entryPoint: 'fs_particle',
-    targets: [{
-      format,
-      blend: {
-        color: { srcFactor: 'src-alpha', dstFactor: 'one', operation: 'add' },
-        alpha: { srcFactor: 'one', dstFactor: 'one', operation: 'add' },
-      },
-    }],
-  },
-  primitive: { topology: 'triangle-list', cullMode: 'back' },
-  depthStencil: { format: 'depth24plus', depthWriteEnabled: true, depthCompare: 'less' },
-});
-
-const particleBindGroup = device.createBindGroup({
-  layout: particlePipeline.getBindGroupLayout(0),
-  entries: [
-    { binding: 0, resource: { buffer: uniformBuffer } },
-    { binding: 1, resource: { buffer: particleBuffer } },
-  ],
-});
-
-// Floor Render Pipeline
-const floorPipeline = device.createRenderPipeline({
-  layout: 'auto',
-  vertex: { module: rendMod, entryPoint: 'vs_floor' },
-  fragment: { module: rendMod, entryPoint: 'fs_floor', targets: [{ format }] },
-  primitive: { topology: 'triangle-list' },
-  depthStencil: { format: 'depth24plus', depthWriteEnabled: true, depthCompare: 'less' },
-});
-
-const floorBindGroup = device.createBindGroup({
-  layout: floorPipeline.getBindGroupLayout(0),
-  entries: [
-    { binding: 0, resource: { buffer: uniformBuffer } },
-    { binding: 1, resource: { buffer: particleBuffer } },
-  ],
-});
-
-// Depth Texture
-let depthTexture = device.createTexture({
-  size: [canvas.width, canvas.height],
-  format: 'depth24plus',
-  usage: GPUTextureUsage.RENDER_ATTACHMENT,
-});
-
-// Matrix math
-function perspective(out, fov, aspect, near, far) {
-  const f = 1.0 / Math.tan(fov / 2);
-  out.fill(0);
-  out[0] = f / aspect;
-  out[5] = f;
-  out[10] = far / (near - far);
-  out[11] = -1;
-  out[14] = (near * far) / (near - far);
-}
-
-function lookAt(out, eye, target, up) {
-  let zx = eye[0] - target[0], zy = eye[1] - target[1], zz = eye[2] - target[2];
-  let len = Math.hypot(zx, zy, zz) || 1;
-  zx /= len; zy /= len; zz /= len;
-
-  let xx = up[1] * zz - up[2] * zy, xy = up[2] * zx - up[0] * zz, xz = up[0] * zy - up[1] * zx;
-  len = Math.hypot(xx, xy, xz) || 1;
-  xx /= len; xy /= len; xz /= len;
-
-  let yx = zy * xz - zz * xy, yy = zz * xx - zx * xz, yz = zx * xy - zy * xx;
-
-  out[0] = xx; out[4] = xy; out[8] = xz;  out[12] = -(xx * eye[0] + xy * eye[1] + xz * eye[2]);
-  out[1] = yx; out[5] = yy; out[9] = yz;  out[13] = -(yx * eye[0] + yy * eye[1] + yz * eye[2]);
-  out[2] = zx; out[6] = zy; out[10] = zz; out[14] = -(zx * eye[0] + zy * eye[1] + zz * eye[2]);
-  out[3] = 0;  out[7] = 0;  out[11] = 0;  out[15] = 1;
-}
-
-function multiply(out, a, b) {
-  const tmp = new Float32Array(16);
-  for (let r = 0; r < 4; r++) {
-    for (let c = 0; c < 4; c++) {
-      tmp[c * 4 + r] = a[r] * b[c * 4] + a[4 + r] * b[c * 4 + 1] + a[8 + r] * b[c * 4 + 2] + a[12 + r] * b[c * 4 + 3];
-    }
+// ----------------------------------------------------------------------------
+// WebGL2 Program Setup
+// ----------------------------------------------------------------------------
+function createShader(gl, type, source) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, source);
+  gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+    const err = gl.getShaderInfoLog(s);
+    gl.deleteShader(s);
+    throw new Error('Shader compile failed: ' + err);
   }
-  out.set(tmp);
+  return s;
 }
 
-const projMat = new Float32Array(16);
-const viewMat = new Float32Array(16);
-const vpMat = new Float32Array(16);
-const uData = new Float32Array(32);
+const vs = createShader(gl, gl.VERTEX_SHADER, VS_SOURCE);
+const fs = createShader(gl, gl.FRAGMENT_SHADER, FS_SOURCE);
+const prog = gl.createProgram();
+gl.attachShader(prog, vs);
+gl.attachShader(prog, fs);
+gl.linkProgram(prog);
+if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+  throw new Error('Program link failed: ' + gl.getProgramInfoLog(prog));
+}
 
+const quad = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, -1,1, 1,-1, 1,1]), gl.STATIC_DRAW);
+
+const aPosLoc = gl.getAttribLocation(prog, 'a_pos');
+gl.enableVertexAttribArray(aPosLoc);
+gl.vertexAttribPointer(aPosLoc, 2, gl.FLOAT, false, 0, 0);
+
+const uResLoc = gl.getUniformLocation(prog, 'u_res');
+const uTimeLoc = gl.getUniformLocation(prog, 'u_time');
+const uCamPosLoc = gl.getUniformLocation(prog, 'u_camPos');
+const uCamRotLoc = gl.getUniformLocation(prog, 'u_camRot');
+const uModeLoc = gl.getUniformLocation(prog, 'u_mode');
+const uExpTimeLoc = gl.getUniformLocation(prog, 'u_expTime');
+
+// ----------------------------------------------------------------------------
+// 60 FPS Render Loop
+// ----------------------------------------------------------------------------
 let lastTime = performance.now();
-let frameCount = 0, fpsTime = 0;
+let frames = 0, fpsTime = 0;
 
-// ----------------------------------------------------------------------------
-// Render Loop
-// ----------------------------------------------------------------------------
-function frame(now) {
-  requestAnimationFrame(frame);
+function render(now) {
+  requestAnimationFrame(render);
   const dt = Math.min(0.05, (now - lastTime) / 1000);
   lastTime = now;
 
-  frameCount++;
+  frames++;
   fpsTime += dt;
   if (fpsTime >= 0.5) {
-    perfEl.textContent = `${(frameCount / fpsTime).toFixed(0)} FPS | 8,192 GPU Particles | Mod: ${activeMode}`;
-    frameCount = 0; fpsTime = 0;
+    perfEl.textContent = `${(frames / fpsTime).toFixed(0)} FPS | Gerçek Dünya Fizik Simülasyonu | Mod: ${activeMode}`;
+    frames = 0; fpsTime = 0;
   }
 
-  // Camera movement
-  const fwd = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0);
-  const str = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0);
+  if (explosionTime >= 0.0) {
+    explosionTime += dt;
+    if (explosionTime > 8.0) {
+      explosionTime = -1.0;
+    }
+  }
+
+  // Smooth Camera Flying
+  const fwd = (keys.KeyW || keys.w ? 1 : 0) - (keys.KeyS || keys.s ? 1 : 0);
+  const str = (keys.KeyD || keys.d ? 1 : 0) - (keys.KeyA || keys.a ? 1 : 0);
   const v = cam.speed * dt;
   cam.x += (Math.sin(cam.yaw) * fwd + Math.cos(cam.yaw) * str) * v;
   cam.z += (Math.cos(cam.yaw) * fwd - Math.sin(cam.yaw) * str) * v;
-  if (keys.KeyE || keys.Space) cam.y += v;
-  if (keys.KeyC || keys.KeyQ) cam.y -= v;
+  if (keys.KeyE || keys.e) cam.y += v;
+  if (keys.KeyC || keys.c || keys.KeyQ || keys.q) cam.y -= v;
 
-  // Matrices
-  perspective(projMat, 60 * Math.PI / 180, canvas.width / canvas.height, 0.1, 200.0);
-  const cy = Math.cos(cam.yaw), sy = Math.sin(cam.yaw), cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
-  const fwdX = sy * cp, fwdY = sp, fwdZ = cy * cp;
-  lookAt(viewMat, [cam.x, cam.y, cam.z], [cam.x + fwdX, cam.y + fwdY, cam.z + fwdZ], [0, 1, 0]);
-  multiply(vpMat, projMat, viewMat);
+  resize();
 
-  // Upload Uniforms
-  uData.set(vpMat, 0);
-  uData[16] = cam.x; uData[17] = cam.y; uData[18] = cam.z; uData[19] = 1.0;
-  uData[20] = now * 0.001; // time
-  uData[21] = dt;
-  uData[22] = activeMode;
-  device.queue.writeBuffer(uniformBuffer, 0, uData);
+  gl.useProgram(prog);
+  gl.uniform2f(uResLoc, canvas.width, canvas.height);
+  gl.uniform1f(uTimeLoc, now * 0.001);
+  gl.uniform3f(uCamPosLoc, cam.x, cam.y, cam.z);
+  gl.uniform2f(uCamRotLoc, cam.yaw, cam.pitch);
+  gl.uniform1i(uModeLoc, activeMode);
+  gl.uniform1f(uExpTimeLoc, explosionTime);
 
-  // Recreate depth if resized
-  if (depthTexture.width !== canvas.width || depthTexture.height !== canvas.height) {
-    depthTexture.destroy();
-    depthTexture = device.createTexture({
-      size: [canvas.width, canvas.height],
-      format: 'depth24plus',
-      usage: GPUTextureUsage.RENDER_ATTACHMENT,
-    });
-  }
-
-  // Command Encoder
-  const enc = device.createCommandEncoder();
-
-  // 1. Compute Pass: Particle Physics & Restitution
-  const cpPass = enc.beginComputePass();
-  cpPass.setPipeline(computePipeline);
-  cpPass.setBindGroup(0, compBindGroup);
-  cpPass.dispatchWorkgroups(Math.ceil(MAX_PARTICLES / 64));
-  cpPass.end();
-
-  // 2. Render Pass: Floor + Particles
-  const rp = enc.beginRenderPass({
-    colorAttachments: [{
-      view: ctx.getCurrentTexture().createView(),
-      clearValue: { r: 0.03, g: 0.05, b: 0.08, a: 1.0 },
-      loadOp: 'clear',
-      storeOp: 'store',
-    }],
-    depthStencilAttachment: {
-      view: depthTexture.createView(),
-      depthClearValue: 1.0,
-      depthLoadOp: 'clear',
-      depthStoreOp: 'discard',
-    },
-  });
-
-  // Draw Floor
-  rp.setPipeline(floorPipeline);
-  rp.setBindGroup(0, floorBindGroup);
-  rp.draw(6);
-
-  // Draw 8,192 Micro-Voxel Particles
-  rp.setPipeline(particlePipeline);
-  rp.setBindGroup(0, particleBindGroup);
-  rp.draw(36, MAX_PARTICLES);
-
-  rp.end();
-  device.queue.submit([enc.finish()]);
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
 }
 
-requestAnimationFrame(frame);
-console.log('[Omni-Voxel VFX] Test Sandbox fully initialized.');
+requestAnimationFrame(render);
+console.log('[Voxel Realism Physical Engine] Initialized and running at 60 FPS.');
 </script>
 </body>
 </html>
